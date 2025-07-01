@@ -17,24 +17,44 @@ export default function ChatPage() {
     Record<string, ChatItem>
   >({});
 
-  // Reset chat when chatId changes
+  // Load all chats on initial load
   useEffect(() => {
-    if (params.chatId) {
-      // Initialize new chat if it doesn't exist
-      if (!availableChats[params.chatId as string]) {
-        setAvailableChats((prev) => ({
-          ...prev,
-          [params.chatId as string]: {
-            id: params.chatId as string,
-            title: "New Chat",
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            messages: [],
-          },
-        }));
+    const loadChats = async () => {
+      try {
+        const response = await fetch("/api/chats");
+        if (response.ok) {
+          const chats = await response.json();
+          setAvailableChats(chats);
+        }
+      } catch (error) {
+        console.error("Error loading chats:", error);
       }
+    };
+
+    loadChats();
+  }, []);
+
+  // Load chat history when chatId changes
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      try {
+        const response = await fetch(`/api/chats/${params.chatId}`);
+        if (response.ok) {
+          const chatData = await response.json();
+          setAvailableChats((prev) => ({
+            ...prev,
+            [params.chatId as string]: chatData,
+          }));
+        }
+      } catch (error) {
+        console.error("Error loading chat history:", error);
+      }
+    };
+
+    if (params.chatId && !availableChats[params.chatId as string]) {
+      loadChatHistory();
     }
-  }, [params.chatId]);
+  }, [params.chatId, availableChats]);
 
   const {
     messages,
@@ -50,6 +70,7 @@ export default function ChatPage() {
     body: {
       chatId: params.chatId,
     },
+    initialMessages: availableChats[params.chatId as string]?.messages || [],
     onFinish: (message) => {
       console.log("Chat finished:", message);
       if (
@@ -119,15 +140,25 @@ export default function ChatPage() {
     console.log("Edit chat:", chatId);
   };
 
-  const handleDeleteChat = (chatId: string) => {
-    setAvailableChats((prev) => {
-      const newChats = { ...prev };
-      delete newChats[chatId];
-      return newChats;
-    });
+  const handleDeleteChat = async (chatId: string) => {
+    try {
+      const response = await fetch(`/api/chats/${chatId}`, {
+        method: "DELETE",
+      });
 
-    if (params.chatId === chatId) {
-      router.push("/");
+      if (response.ok) {
+        setAvailableChats((prev) => {
+          const newChats = { ...prev };
+          delete newChats[chatId];
+          return newChats;
+        });
+
+        if (params.chatId === chatId) {
+          router.push("/");
+        }
+      }
+    } catch (error) {
+      console.error("Error deleting chat:", error);
     }
   };
 

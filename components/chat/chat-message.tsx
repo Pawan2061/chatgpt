@@ -24,11 +24,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
           isUser ? "flex-row-reverse" : ""
         )}
       >
-        {/* {!isUser && (
-          <div className="flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-full bg-neutral-800 text-white">
-            {isUser ? "U" : "A"}
-          </div>
-        )} */}
         <div
           className={cn(
             "flex-1 space-y-4",
