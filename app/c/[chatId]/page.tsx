@@ -17,38 +17,64 @@ export default function ChatPage() {
     Record<string, ChatItem>
   >({});
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error } =
-    useChat({
-      api: "/api/chat",
-      id: params.chatId as string,
-      body: {
-        chatId: params.chatId,
-      },
-      onFinish: (message) => {
-        console.log("Chat finished:", message);
-        // Update chat title after first message if it's "New Chat"
-        if (
-          availableChats[params.chatId as string]?.title === "New Chat" &&
-          messages.length === 0
-        ) {
-          const firstMessage = input.slice(0, 30) + "...";
-          setAvailableChats((prev) => ({
-            ...prev,
-            [params.chatId as string]: {
-              ...prev[params.chatId as string],
-              title: firstMessage,
-            },
-          }));
-        }
-      },
-      onError: (error) => {
-        console.error("Chat error:", error);
-      },
-    });
+  // Reset chat when chatId changes
+  useEffect(() => {
+    if (params.chatId) {
+      // Initialize new chat if it doesn't exist
+      if (!availableChats[params.chatId as string]) {
+        setAvailableChats((prev) => ({
+          ...prev,
+          [params.chatId as string]: {
+            id: params.chatId as string,
+            title: "New Chat",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            messages: [],
+          },
+        }));
+      }
+    }
+  }, [params.chatId]);
 
-  // Custom submit handler to wrap the useChat submit
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+    error,
+    setMessages,
+  } = useChat({
+    api: "/api/chat",
+    id: params.chatId as string,
+    body: {
+      chatId: params.chatId,
+    },
+    onFinish: (message) => {
+      console.log("Chat finished:", message);
+      if (
+        availableChats[params.chatId as string]?.title === "New Chat" &&
+        messages.length === 0
+      ) {
+        const firstMessage = input.slice(0, 30) + "...";
+        setAvailableChats((prev) => ({
+          ...prev,
+          [params.chatId as string]: {
+            ...prev[params.chatId as string],
+            title: firstMessage,
+          },
+        }));
+      }
+    },
+    onError: (error) => {
+      console.error("Chat error:", error);
+    },
+  });
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!input.trim()) return;
+
     console.log("Submitting message:", input);
     try {
       await handleSubmit(e);
@@ -57,20 +83,20 @@ export default function ChatPage() {
     }
   };
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Debug logging
-  useEffect(() => {
-    console.log("Current messages:", messages);
-    console.log("Loading state:", isLoading);
-    console.log("Error state:", error);
-  }, [messages, isLoading, error]);
-
   const handleNewChat = () => {
-    const newChatId = Date.now().toString();
+    // Generate a unique ID using timestamp and random number
+    const newChatId = `${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+
+    // Reset messages for the new chat
+    setMessages([]);
+
+    // Create new chat
     const newChat: ChatItem = {
       id: newChatId,
       title: "New Chat",
@@ -79,10 +105,13 @@ export default function ChatPage() {
       messages: [],
     };
 
+    // Update available chats
     setAvailableChats((prev) => ({
       ...prev,
       [newChatId]: newChat,
     }));
+
+    // Navigate to the new chat route
     router.push(`/c/${newChatId}`);
   };
 
@@ -117,7 +146,7 @@ export default function ChatPage() {
       <div className="flex-1 flex flex-col relative">
         <div className="flex-1 overflow-hidden">
           <div className="h-full overflow-y-auto">
-            <div className="pb-[200px]">
+            <div className="pb-[120px]">
               {messages.map((message: Message, index: number) => (
                 <ChatMessage key={index} message={message} />
               ))}
@@ -136,7 +165,7 @@ export default function ChatPage() {
           </div>
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#171717] to-transparent pt-24 pb-8">
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#171717] via-[#171717] to-transparent pt-6 pb-6">
           <form
             onSubmit={handleFormSubmit}
             className="w-full max-w-[800px] mx-auto px-4"
