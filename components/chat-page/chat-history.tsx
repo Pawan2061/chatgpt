@@ -21,9 +21,11 @@ export function ChatHistory({
   onEditChat,
   onDeleteChat,
 }: ChatHistoryProps) {
-  const sortedChats = Object.values(availableChats).sort(
-    (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
-  );
+  const sortedChats = Object.values(availableChats).sort((a, b) => {
+    const dateA = new Date(a.updatedAt);
+    const dateB = new Date(b.updatedAt);
+    return dateB.getTime() - dateA.getTime();
+  });
 
   if (sortedChats.length === 0) {
     return (

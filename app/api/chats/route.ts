@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
-import { Chat } from "@/lib/models/chat";
-import connectToDatabase from "@/lib/db";
+import { Chat, IMessage } from "@/lib/models/chat";
+import connectDB from "@/lib/db";
+import { Types } from "mongoose";
+
+interface ChatObject {
+  _id: Types.ObjectId;
+  userId: string;
+  title?: string;
+  messages: IMessage[];
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export async function GET() {
   try {
-    const user = await currentUser();
-    const userId = user?.id;
+    const userId = "test-user";
 
     if (!userId) {
       return NextResponse.json(
@@ -15,22 +23,24 @@ export async function GET() {
       );
     }
 
-    await connectToDatabase();
+    await connectDB();
 
     const chats = await Chat.find({ userId }).sort({ updatedAt: -1 });
 
-    // Convert chats to a record format
-
-    const chatsRecord = chats.reduce((acc, chat) => {
-      acc[chat._id] = {
-        id: chat._id,
-        title: chat.title || "New Chat",
-        messages: chat.messages,
-        createdAt: chat.createdAt,
-        updatedAt: chat.updatedAt,
+    const chatsRecord = chats.reduce<
+      Record<string, Omit<ChatObject, "_id"> & { id: string }>
+    >((acc, chat) => {
+      const chatObj = chat.toObject() as ChatObject;
+      acc[chatObj._id.toString()] = {
+        id: chatObj._id.toString(),
+        userId: chatObj.userId,
+        title: chatObj.title || "New Chat",
+        messages: chatObj.messages,
+        createdAt: chatObj.createdAt,
+        updatedAt: chatObj.updatedAt,
       };
       return acc;
-    }, {} as Record<string, any>);
+    }, {});
 
     return NextResponse.json(chatsRecord);
   } catch (error) {

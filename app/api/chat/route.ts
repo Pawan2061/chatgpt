@@ -1,19 +1,16 @@
 import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { Chat, IMessage } from "@/lib/models/chat";
-import connectToDatabase from "@/lib/db";
-import { currentUser } from "@clerk/nextjs/server";
+import connectDB from "@/lib/db";
+import mongoose from "mongoose";
+// import { currentUser } from "@clerk/nextjs/server";
 
 // Create an OpenAI API client
-
-// IMPORTANT! Set the runtime to edge
-export const runtime = "edge";
 
 export async function POST(req: Request) {
   try {
     const { messages, chatId } = await req.json();
-    const user = await currentUser();
-    const userId = user?.id;
+    const userId = "test-user";
 
     if (!userId) {
       return new Response(
@@ -28,35 +25,43 @@ export async function POST(req: Request) {
       );
     }
 
-    // Connect to database
-    await connectToDatabase();
+    await connectDB();
 
-    // Find or create chat
-    let chat = await Chat.findOne({ _id: chatId, userId: "nwdwb" });
+    let chat;
 
-    if (!chat && chatId) {
-      chat = new Chat({
-        _id: chatId,
-        userId,
-        messages: [],
-        title: "New Chat",
-      });
+    // Try to find existing chat
+    try {
+      if (mongoose.Types.ObjectId.isValid(chatId)) {
+        chat = await Chat.findOne({ _id: chatId, userId });
+      }
+    } catch (error) {
+      console.log("Error finding chat:", error);
     }
 
+    // Create new chat if it doesn't exist
     if (!chat) {
-      return new Response(
-        JSON.stringify({
-          error: "Chat not found",
-          details: "Unable to create or find chat",
-        }),
-        {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      try {
+        chat = new Chat({
+          _id: new mongoose.Types.ObjectId(),
+          userId,
+          messages: [],
+          title: "New Chat",
+        });
+      } catch (error) {
+        console.error("Error creating new chat:", error);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to create chat",
+            details: error instanceof Error ? error.message : "Unknown error",
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
     }
 
-    // Add the new message to the chat
     const userMessage: IMessage = {
       role: "user",
       content: messages[messages.length - 1].content,
@@ -80,10 +85,9 @@ export async function POST(req: Request) {
       temperature: 0.7,
     });
 
-    // Save the chat after getting response
     const assistantMessage: IMessage = {
       role: "assistant",
-      content: "", // This will be updated with the streamed response
+      content: "Processing...",
       createdAt: new Date(),
       updatedAt: new Date(),
     };

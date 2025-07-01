@@ -4,6 +4,7 @@ import { ChatSidebar } from "@/components/sidebar/sidebar";
 import { useState } from "react";
 import { ChatItem } from "@/types/type";
 import { Textarea } from "@/components/ui/textarea";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -11,7 +12,7 @@ export default function Home() {
   const [availableChats, setAvailableChats] = useState<
     Record<string, ChatItem>
   >({});
-
+  const router = useRouter();
   const handleNewChat = () => {
     const newChatId = Date.now().toString();
     const newChat: ChatItem = {
@@ -27,6 +28,7 @@ export default function Home() {
       [newChatId]: newChat,
     }));
     setSelectedChatId(newChatId);
+    router.push(`/c/${newChatId}`);
   };
 
   const handleEditChat = (chatId: string) => {

@@ -1,12 +1,12 @@
 export interface ChatItem {
   id: string;
   title: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
   messages: Array<{
     id: string;
     content: string;
     role: "user" | "assistant";
-    createdAt: Date;
+    createdAt: Date | string;
   }>;
 }

@@ -22,6 +22,8 @@ async function connectDB() {
   }
 
   const MONGODB_URI = process.env.MONGODB_URI;
+  console.log("Attempting to connect to MongoDB...");
+  console.log("MongoDB URI exists:", !!MONGODB_URI);
 
   if (!MONGODB_URI) {
     throw new Error(
@@ -30,11 +32,21 @@ async function connectDB() {
   }
 
   try {
-    const db = await mongoose.connect(MONGODB_URI);
+    const db = await mongoose.connect(MONGODB_URI, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
     connection.isConnected = db.connections[0].readyState;
     console.log("MongoDB Connected Successfully!");
+    console.log("Database name:", db.connections[0].name);
+    return db;
   } catch (error) {
     console.error("Error connecting to MongoDB:", error);
+    if (error instanceof Error) {
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+    }
     throw error;
   }
 }

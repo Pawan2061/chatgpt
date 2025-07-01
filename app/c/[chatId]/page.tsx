@@ -108,16 +108,27 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleNewChat = () => {
-    // Generate a unique ID using timestamp and random number
-    const newChatId = `${Date.now()}-${Math.random()
-      .toString(36)
-      .substr(2, 9)}`;
+  const generateObjectId = () => {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const machineId = Math.floor(Math.random() * 16777216);
+    const processId = Math.floor(Math.random() * 65536);
+    const counter = Math.floor(Math.random() * 16777216);
 
-    // Reset messages for the new chat
+    const buffer = Buffer.from(
+      Array.from({ length: 12 }, (_, i) => {
+        if (i < 4) return (timestamp >> ((3 - i) * 8)) & 0xff;
+        if (i < 7) return (machineId >> ((6 - i) * 8)) & 0xff;
+        if (i < 9) return (processId >> ((8 - i) * 8)) & 0xff;
+        return (counter >> ((11 - i) * 8)) & 0xff;
+      })
+    );
+    return buffer.toString("hex");
+  };
+
+  const handleNewChat = () => {
+    const newChatId = generateObjectId();
     setMessages([]);
 
-    // Create new chat
     const newChat: ChatItem = {
       id: newChatId,
       title: "New Chat",
@@ -126,13 +137,11 @@ export default function ChatPage() {
       messages: [],
     };
 
-    // Update available chats
     setAvailableChats((prev) => ({
       ...prev,
       [newChatId]: newChat,
     }));
 
-    // Navigate to the new chat route
     router.push(`/c/${newChatId}`);
   };
 
