@@ -136,7 +136,6 @@ export default function Home() {
             </div>
           ) : (
             <div className="h-full overflow-y-auto">
-              heyy
               {/* Chat messages will go here */}
             </div>
           )}
