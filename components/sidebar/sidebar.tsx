@@ -2,16 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Search,
-  Play,
-  Grid3X3,
-  Brain,
-  X,
-  PanelLeftClose,
-  Edit3,
-  Shield,
-} from "lucide-react";
+import { Search, Play, Grid3X3, Brain, X, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { SearchModal } from "@/components/search-modal";
 import type { ChatItem } from "@/types/type";
@@ -108,7 +99,10 @@ export function ChatSidebar({
             </Button>
 
             <Button
-              onClick={() => onToggleMobileMenu(false)}
+              onClick={() => {
+                onNewChat();
+                onToggleMobileMenu(false);
+              }}
               className="md:hidden p-2 h-8 w-8 bg-transparent hover:bg-white/10 text-white/70"
             >
               <X className="h-4 w-4" />
@@ -374,25 +368,6 @@ export function ChatSidebar({
         onNewChat={onNewChat}
       />
 
-      {isCollapsed && (
-        <div className="hidden md:block fixed top-4 left-[120px] z-30">
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleToggleCollapse}
-              className="p-2 h-7 w-7 bg-transparent hover:bg-white/10 text-white/70 hover:text-white rounded-md border border-white/20"
-            >
-              <PanelLeftClose className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              onClick={onNewChat}
-              className="p-2 h-7 w-7 bg-transparent hover:bg-white/10 text-white/70 hover:text-white rounded-md border border-white/20"
-            >
-              <Edit3 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-      )}
-
       <div
         className={`${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -401,7 +376,7 @@ export function ChatSidebar({
         } h-full bg-[#0f0f0f] border-r border-neutral-700/50 flex flex-col transition-all duration-300`}
       >
         {isCollapsed ? (
-          // Collapsed sidebar content
+          // Collapsed sidebar - minimal view
           <div className="flex flex-col h-full p-2">
             <div className="flex-shrink-0 mb-4">
               <div className="flex items-center justify-center mb-4">

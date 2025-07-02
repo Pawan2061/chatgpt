@@ -158,20 +158,14 @@ export default function ChatPage() {
   }, [messages]);
 
   const generateObjectId = () => {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const machineId = Math.floor(Math.random() * 16777216);
-    const processId = Math.floor(Math.random() * 65536);
-    const counter = Math.floor(Math.random() * 16777216);
-
-    const buffer = Buffer.from(
-      Array.from({ length: 12 }, (_, i) => {
-        if (i < 4) return (timestamp >> ((3 - i) * 8)) & 0xff;
-        if (i < 7) return (machineId >> ((6 - i) * 8)) & 0xff;
-        if (i < 9) return (processId >> ((8 - i) * 8)) & 0xff;
-        return (counter >> ((11 - i) * 8)) & 0xff;
-      })
-    );
-    return buffer.toString("hex");
+    // Generate a proper MongoDB ObjectId format (24 character hex string)
+    const timestamp = Math.floor(Date.now() / 1000)
+      .toString(16)
+      .padStart(8, "0");
+    const randomBytes = Array.from({ length: 16 }, () =>
+      Math.floor(Math.random() * 16).toString(16)
+    ).join("");
+    return timestamp + randomBytes;
   };
 
   const handleNewChat = () => {

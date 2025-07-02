@@ -17,10 +17,13 @@ export async function POST(req: Request) {
     await connectDB();
 
     let chat;
+    let actualChatId;
 
-    // Try to find existing chat by chatId
-    if (mongoose.Types.ObjectId.isValid(chatId)) {
-      chat = await Chat.findOne({ _id: chatId, userId });
+    // Handle ObjectId creation/validation
+    if (chatId && mongoose.Types.ObjectId.isValid(chatId)) {
+      // Valid ObjectId provided, try to find existing chat
+      actualChatId = chatId;
+      chat = await Chat.findOne({ _id: actualChatId, userId });
       console.log(
         "Found existing chat:",
         !!chat,
@@ -28,13 +31,17 @@ export async function POST(req: Request) {
         chat?.messages?.length || 0,
         "messages"
       );
+    } else {
+      // Invalid or no ObjectId provided, generate a new one
+      actualChatId = new mongoose.Types.ObjectId().toString();
+      console.log("Generated new ObjectId:", actualChatId);
     }
 
     // Create new chat if it doesn't exist
     if (!chat) {
-      console.log("Creating new chat with ID:", chatId);
+      console.log("Creating new chat with ID:", actualChatId);
       chat = new Chat({
-        _id: new mongoose.Types.ObjectId(chatId),
+        _id: new mongoose.Types.ObjectId(actualChatId),
         userId,
         messages: [],
         title: "New Chat",
@@ -164,7 +171,7 @@ export async function POST(req: Request) {
           };
 
           // Reload the chat to ensure we have the latest version
-          const updatedChat = await Chat.findOne({ _id: chatId, userId });
+          const updatedChat = await Chat.findOne({ _id: actualChatId, userId });
           if (updatedChat) {
             updatedChat.messages.push(assistantMessage);
             updatedChat.updatedAt = new Date();
