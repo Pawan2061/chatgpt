@@ -7,17 +7,19 @@ import mongoose from "mongoose";
 export async function POST(req: Request) {
   try {
     const { messages, chatId, files } = await req.json();
-    const userId = "test-user";
 
+    // Get authenticated user
+    const userId = "test-user"; // const user = await currentUser();
     console.log("=== Chat API Request ===");
     console.log("ChatId:", chatId);
     console.log("Messages received:", messages?.length);
     console.log("Files:", files?.length || 0);
+    console.log("User ID:", userId);
 
     await connectDB();
 
     let chat;
-    let actualChatId;
+    let actualChatId: string = "";
 
     // Handle ObjectId creation/validation
     if (chatId && mongoose.Types.ObjectId.isValid(chatId)) {
@@ -31,25 +33,52 @@ export async function POST(req: Request) {
         chat?.messages?.length || 0,
         "messages"
       );
-    } else {
-      // Invalid or no ObjectId provided, generate a new one
-      actualChatId = new mongoose.Types.ObjectId().toString();
-      console.log("Generated new ObjectId:", actualChatId);
     }
 
     // Create new chat if it doesn't exist
     if (!chat) {
+      // Generate a new ObjectId if we don't have a valid one or if the chat doesn't exist
+      if (!actualChatId || !mongoose.Types.ObjectId.isValid(actualChatId)) {
+        actualChatId = new mongoose.Types.ObjectId().toString();
+      }
+
       console.log("Creating new chat with ID:", actualChatId);
-      chat = new Chat({
-        _id: new mongoose.Types.ObjectId(actualChatId),
-        userId,
-        messages: [],
-        title: "New Chat",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      await chat.save();
-      console.log("New chat created successfully");
+
+      try {
+        chat = new Chat({
+          _id: new mongoose.Types.ObjectId(actualChatId),
+          userId,
+          messages: [],
+          title: "New Chat",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        await chat.save();
+        console.log("New chat created successfully");
+      } catch (error: unknown) {
+        if (
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          error.code === 11000
+        ) {
+          // Duplicate key error, generate a completely new ObjectId
+          console.log("Duplicate key detected, generating new ObjectId");
+          actualChatId = new mongoose.Types.ObjectId().toString();
+          chat = new Chat({
+            _id: new mongoose.Types.ObjectId(actualChatId),
+            userId,
+            messages: [],
+            title: "New Chat",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+          await chat.save();
+          console.log("New chat created with fresh ObjectId:", actualChatId);
+        } else {
+          throw error;
+        }
+      }
     }
 
     // Get the current user message (last message from the client)
@@ -94,37 +123,36 @@ export async function POST(req: Request) {
     );
 
     // Prepare messages for OpenAI API using the complete chat history
-    const openAIMessages: Array<{
-      role: "system" | "user" | "assistant";
+    const openAIMessages: any[] = [];
+
+    // Add system message
+    openAIMessages.push({
+      role: "system",
       content:
-        | string
-        | Array<{ type: string; text?: string; image_url?: { url: string } }>;
-    }> = [
-      {
-        role: "system",
-        content:
-          "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using Markdown.",
-      },
-    ];
+        "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using Markdown. When analyzing images, provide detailed and helpful descriptions and answers.",
+    });
 
     // Add all messages from the chat history
     for (const msg of chat.messages) {
       if (msg.role === "user") {
         if (msg.files && msg.files.length > 0) {
-          // Handle multimodal user messages
-          const content = [];
+          // Handle multimodal user messages - use the correct format for AI SDK v4
+          const parts: any[] = [];
+
           if (msg.content.trim()) {
-            content.push({ type: "text", text: msg.content });
+            parts.push({ type: "text", text: msg.content });
           }
+
           msg.files.forEach((imageUrl: string) => {
-            content.push({
-              type: "image_url",
-              image_url: { url: imageUrl },
+            parts.push({
+              type: "image",
+              image: imageUrl,
             });
           });
+
           openAIMessages.push({
             role: "user",
-            content: content,
+            content: parts,
           });
         } else {
           // Text-only user message
@@ -147,14 +175,33 @@ export async function POST(req: Request) {
     const hasAnyImages = chat.messages.some(
       (msg) => msg.files && msg.files.length > 0
     );
-    const modelToUse = hasAnyImages ? "gpt-4-vision-preview" : "gpt-4-turbo";
+
+    // Use the correct model names - gpt-4o supports vision
+    const modelToUse = hasAnyImages ? "gpt-4o" : "gpt-4-turbo";
 
     console.log("Using model:", modelToUse);
+    console.log("Has images:", hasAnyImages);
+
+    // Log the structure of messages being sent to OpenAI for debugging
+    console.log(
+      "OpenAI Messages structure:",
+      JSON.stringify(
+        openAIMessages.map((msg) => ({
+          role: msg.role,
+          contentType: typeof msg.content,
+          hasImages:
+            Array.isArray(msg.content) &&
+            msg.content.some((c: any) => c.type === "image"),
+        })),
+        null,
+        2
+      )
+    );
 
     // Request the OpenAI API for the response
     const response = await streamText({
       model: openai(modelToUse),
-      messages: openAIMessages as any,
+      messages: openAIMessages,
       temperature: 0.7,
       maxTokens: 4000,
       onFinish: async (result) => {
@@ -197,7 +244,7 @@ export async function POST(req: Request) {
 
     return response.toDataStreamResponse();
   } catch (error) {
-    console.error("Error in chat API:", error);
+    // console.error("Error in chat API:", error);
     return new Response(
       JSON.stringify({
         error: "Internal Server Error",

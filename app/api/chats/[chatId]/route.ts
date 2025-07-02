@@ -10,14 +10,9 @@ export async function GET(
   try {
     const { chatId } = await params;
     const user = await currentUser();
-    const userId = user?.id;
+    const userId = user?.id || "anonymous-user"; // Fallback for development
 
-    // if (!userId) {
-    //   return NextResponse.json(
-    //     { error: "Unauthorized", details: "User not authenticated" },
-    //     { status: 401 }
-    //   );
-    // }
+    console.log("GET chat request - ChatId:", chatId, "UserId:", userId);
 
     await connectToDatabase();
 
@@ -50,14 +45,9 @@ export async function DELETE(
   try {
     const { chatId } = await params;
     const user = await currentUser();
-    const userId = user?.id;
+    const userId = user?.id || "anonymous-user"; // Fallback for development
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized", details: "User not authenticated" },
-        { status: 401 }
-      );
-    }
+    console.log("DELETE chat request - ChatId:", chatId, "UserId:", userId);
 
     await connectToDatabase();
 

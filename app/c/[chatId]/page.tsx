@@ -40,7 +40,6 @@ export default function ChatPage() {
     loadChats();
   }, []);
 
-  // Load specific chat when chatId changes
   useEffect(() => {
     const loadChatHistory = async () => {
       if (!params.chatId) return;
@@ -157,19 +156,11 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const generateObjectId = () => {
-    // Generate a proper MongoDB ObjectId format (24 character hex string)
-    const timestamp = Math.floor(Date.now() / 1000)
-      .toString(16)
-      .padStart(8, "0");
-    const randomBytes = Array.from({ length: 16 }, () =>
-      Math.floor(Math.random() * 16).toString(16)
-    ).join("");
-    return timestamp + randomBytes;
-  };
-
   const handleNewChat = () => {
-    const newChatId = generateObjectId();
+    // Let the backend generate the ObjectId to avoid conflicts
+    const newChatId = `new-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
     setMessages([]);
     setUploadedImages([]);
     router.push(`/c/${newChatId}`);
