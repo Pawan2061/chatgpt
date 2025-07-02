@@ -7,7 +7,7 @@ import { ChatSidebar } from "@/components/sidebar/sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { ChatItem } from "@/types/type";
 import { ChatMessage } from "@/components/chat/chat-message";
-import { ImageUpload } from "@/components/ui/image-upload";
+import { FileUpload, UploadedFile } from "@/components/ui/file-upload";
 
 export default function ChatPage() {
   const params = useParams();
@@ -17,7 +17,7 @@ export default function ChatPage() {
   const [availableChats, setAvailableChats] = useState<
     Record<string, ChatItem>
   >({});
-  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isLoadingChats, setIsLoadingChats] = useState(true);
 
   // Load all chats on initial load
@@ -81,7 +81,7 @@ export default function ChatPage() {
     id: params.chatId as string,
     body: {
       chatId: params.chatId,
-      files: uploadedImages,
+      files: uploadedFiles,
     },
     initialMessages:
       currentChat?.messages?.map((msg, index) => ({
@@ -92,7 +92,7 @@ export default function ChatPage() {
       })) || [],
     onFinish: (message) => {
       console.log("Chat finished:", message);
-      setUploadedImages([]);
+      setUploadedFiles([]);
 
       const reloadChat = async () => {
         try {
@@ -134,16 +134,16 @@ export default function ChatPage() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Allow submission if there's text input OR uploaded images
+    // Allow submission if there's text input OR uploaded files
     const hasText = input.trim().length > 0;
-    const hasImages = uploadedImages.length > 0;
+    const hasFiles = uploadedFiles.length > 0;
 
-    if (!hasText && !hasImages) {
-      return; // Don't submit if neither text nor images
+    if (!hasText && !hasFiles) {
+      return; // Don't submit if neither text nor files
     }
 
     console.log("Submitting message:", input);
-    console.log("With images:", uploadedImages);
+    console.log("With files:", uploadedFiles);
 
     try {
       await handleSubmit(e);
@@ -157,12 +157,18 @@ export default function ChatPage() {
   }, [messages]);
 
   const handleNewChat = () => {
-    // Let the backend generate the ObjectId to avoid conflicts
-    const newChatId = `new-${Date.now()}-${Math.random()
-      .toString(36)
-      .substr(2, 9)}`;
+    // Generate a proper MongoDB ObjectId format
+    // This mimics MongoDB ObjectId generation: 12-byte identifier as 24-character hex string
+    const timestamp = Math.floor(Date.now() / 1000)
+      .toString(16)
+      .padStart(8, "0");
+    const randomBytes = Array.from({ length: 16 }, () =>
+      Math.floor(Math.random() * 16).toString(16)
+    ).join("");
+    const newChatId = timestamp + randomBytes;
+
     setMessages([]);
-    setUploadedImages([]);
+    setUploadedFiles([]);
     router.push(`/c/${newChatId}`);
   };
 
@@ -192,12 +198,12 @@ export default function ChatPage() {
     }
   };
 
-  const handleImageUpload = (imageUrl: string) => {
-    setUploadedImages((prev) => [...prev, imageUrl]);
+  const handleFileUpload = (file: UploadedFile) => {
+    setUploadedFiles((prev) => [...prev, file]);
   };
 
-  const handleImageRemove = (imageUrl: string) => {
-    setUploadedImages((prev) => prev.filter((url) => url !== imageUrl));
+  const handleFileRemove = (fileUrl: string) => {
+    setUploadedFiles((prev) => prev.filter((file) => file.url !== fileUrl));
   };
 
   return (
@@ -271,27 +277,6 @@ export default function ChatPage() {
             onSubmit={handleFormSubmit}
             className="w-full max-w-[800px] mx-auto px-4"
           >
-            {uploadedImages.length > 0 && (
-              <div className="mb-4 flex flex-wrap gap-2">
-                {uploadedImages.map((imageUrl, index) => (
-                  <div key={index} className="relative">
-                    <img
-                      src={imageUrl}
-                      alt={`Upload ${index + 1}`}
-                      className="w-16 h-16 object-cover rounded-lg border border-neutral-600"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleImageRemove(imageUrl)}
-                      className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div className="relative backdrop-blur-sm rounded-2xl border border-neutral-700/50 shadow-2xl shadow-black/20 transition-all duration-200 hover:border-neutral-600/50 focus-within:border-neutral-500/50">
               <Textarea
                 value={input}
@@ -307,16 +292,16 @@ export default function ChatPage() {
                 disabled={isLoading}
               />
               <div className="absolute right-2 bottom-2.5 flex items-center gap-2">
-                <ImageUpload
-                  onImageUpload={handleImageUpload}
-                  onImageRemove={handleImageRemove}
-                  uploadedImages={uploadedImages}
+                <FileUpload
+                  onFileUpload={handleFileUpload}
+                  onFileRemove={handleFileRemove}
+                  uploadedFiles={uploadedFiles}
                   disabled={isLoading}
                 />
                 <button
                   type="submit"
                   disabled={
-                    isLoading || (!input.trim() && uploadedImages.length === 0)
+                    isLoading || (!input.trim() && uploadedFiles.length === 0)
                   }
                   className="p-1 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >

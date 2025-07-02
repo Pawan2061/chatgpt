@@ -21,9 +21,8 @@ export async function POST(req: Request) {
     let chat;
     let actualChatId: string = "";
 
-    // Handle ObjectId creation/validation
-    if (chatId && mongoose.Types.ObjectId.isValid(chatId)) {
-      // Valid ObjectId provided, try to find existing chat
+    // Check if chatId is provided and is a valid 24-character hex string (MongoDB ObjectId format)
+    if (chatId && /^[0-9a-fA-F]{24}$/.test(chatId)) {
       actualChatId = chatId;
       chat = await Chat.findOne({ _id: actualChatId, userId });
       console.log(
@@ -35,10 +34,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // Create new chat if it doesn't exist
     if (!chat) {
-      // Generate a new ObjectId if we don't have a valid one or if the chat doesn't exist
-      if (!actualChatId || !mongoose.Types.ObjectId.isValid(actualChatId)) {
+      // Use the provided chatId if it's a valid 24-character hex string, otherwise generate new one
+      if (chatId && /^[0-9a-fA-F]{24}$/.test(chatId)) {
+        actualChatId = chatId;
+      } else {
         actualChatId = new mongoose.Types.ObjectId().toString();
       }
 
@@ -84,14 +84,14 @@ export async function POST(req: Request) {
     // Get the current user message (last message from the client)
     const currentUserMessage = messages[messages.length - 1];
     const messageContent = currentUserMessage?.content || "";
-    const hasImages = files && Array.isArray(files) && files.length > 0;
+    const hasFiles = files && Array.isArray(files) && files.length > 0;
 
     // Validate message content
-    if (!messageContent.trim() && !hasImages) {
+    if (!messageContent.trim() && !hasFiles) {
       return new Response(
         JSON.stringify({
           error: "Empty message",
-          details: "Please provide text or images",
+          details: "Please provide text or files",
         }),
         {
           status: 400,
@@ -100,11 +100,27 @@ export async function POST(req: Request) {
       );
     }
 
+    // Process files and prepare content
+    let finalMessageContent = messageContent;
+    const imageFiles: string[] = [];
+
+    if (hasFiles) {
+      for (const file of files) {
+        if (file.type === "image") {
+          // Keep images for vision model
+          imageFiles.push(file.url);
+        } else if (file.type === "document" && file.extractedContent) {
+          // Add document content to message
+          finalMessageContent += `\n\n--- Document: ${file.name} ---\n${file.extractedContent}\n--- End of Document ---`;
+        }
+      }
+    }
+
     // Add the new user message to the chat
     const userMessage: IMessage = {
       role: "user",
-      content: messageContent || "Please analyze the uploaded image(s)",
-      files: files || [],
+      content: finalMessageContent || "Please analyze the uploaded files",
+      files: files?.map((f: { url: string }) => f.url) || [],
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -123,6 +139,7 @@ export async function POST(req: Request) {
     );
 
     // Prepare messages for OpenAI API using the complete chat history
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const openAIMessages: any[] = [];
 
     // Add system message
@@ -136,24 +153,38 @@ export async function POST(req: Request) {
     for (const msg of chat.messages) {
       if (msg.role === "user") {
         if (msg.files && msg.files.length > 0) {
-          // Handle multimodal user messages - use the correct format for AI SDK v4
-          const parts: any[] = [];
+          // Check if this message has images (for multimodal processing)
+          const hasImages =
+            imageFiles.length > 0 &&
+            msg === chat.messages[chat.messages.length - 1];
 
-          if (msg.content.trim()) {
-            parts.push({ type: "text", text: msg.content });
-          }
+          if (hasImages) {
+            // Handle multimodal user messages - use the correct format for AI SDK v4
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const parts: any[] = [];
 
-          msg.files.forEach((imageUrl: string) => {
-            parts.push({
-              type: "image",
-              image: imageUrl,
+            if (msg.content.trim()) {
+              parts.push({ type: "text", text: msg.content });
+            }
+
+            imageFiles.forEach((imageUrl: string) => {
+              parts.push({
+                type: "image",
+                image: imageUrl,
+              });
             });
-          });
 
-          openAIMessages.push({
-            role: "user",
-            content: parts,
-          });
+            openAIMessages.push({
+              role: "user",
+              content: parts,
+            });
+          } else {
+            // Text-only user message (documents are already included in content)
+            openAIMessages.push({
+              role: "user",
+              content: msg.content,
+            });
+          }
         } else {
           // Text-only user message
           openAIMessages.push({
@@ -171,16 +202,14 @@ export async function POST(req: Request) {
 
     console.log("Prepared", openAIMessages.length, "messages for OpenAI API");
 
-    // Determine which model to use based on whether any message in the conversation has images
-    const hasAnyImages = chat.messages.some(
-      (msg) => msg.files && msg.files.length > 0
-    );
+    // Determine which model to use based on whether the current message has images
+    const hasImages = imageFiles.length > 0;
 
     // Use the correct model names - gpt-4o supports vision
-    const modelToUse = hasAnyImages ? "gpt-4o" : "gpt-4-turbo";
+    const modelToUse = hasImages ? "gpt-4o" : "gpt-4-turbo";
 
     console.log("Using model:", modelToUse);
-    console.log("Has images:", hasAnyImages);
+    console.log("Has images:", hasImages);
 
     // Log the structure of messages being sent to OpenAI for debugging
     console.log(
@@ -191,6 +220,7 @@ export async function POST(req: Request) {
           contentType: typeof msg.content,
           hasImages:
             Array.isArray(msg.content) &&
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             msg.content.some((c: any) => c.type === "image"),
         })),
         null,

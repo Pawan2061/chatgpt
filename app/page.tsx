@@ -14,7 +14,15 @@ export default function Home() {
   >({});
   const router = useRouter();
   const handleNewChat = () => {
-    const newChatId = Date.now().toString();
+    // Generate a proper MongoDB ObjectId format
+    const timestamp = Math.floor(Date.now() / 1000)
+      .toString(16)
+      .padStart(8, "0");
+    const randomBytes = Array.from({ length: 16 }, () =>
+      Math.floor(Math.random() * 16).toString(16)
+    ).join("");
+    const newChatId = timestamp + randomBytes;
+
     const newChat: ChatItem = {
       id: newChatId,
       title: "New Chat",
@@ -48,13 +56,17 @@ export default function Home() {
     }
   };
 
+  const handleSelectChat = (chatId: string) => {
+    setSelectedChatId(chatId);
+  };
+
   return (
     <div className="flex h-screen bg-[#171717] overflow-hidden">
       <ChatSidebar
-        selectedChatId={selectedChatId}
+        selectedChatId={selectedChatId || ""}
         availableChats={availableChats}
         onNewChat={handleNewChat}
-        onSelectChat={setSelectedChatId}
+        onSelectChat={handleSelectChat}
         onEditChat={handleEditChat}
         onDeleteChat={handleDeleteChat}
         isMobileMenuOpen={isMobileMenuOpen}
