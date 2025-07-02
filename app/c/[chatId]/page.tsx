@@ -18,11 +18,13 @@ export default function ChatPage() {
     Record<string, ChatItem>
   >({});
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [isLoadingChats, setIsLoadingChats] = useState(true);
 
   // Load all chats on initial load
   useEffect(() => {
     const loadChats = async () => {
       try {
+        setIsLoadingChats(true);
         const response = await fetch("/api/chats");
         if (response.ok) {
           const chats = await response.json();
@@ -30,15 +32,19 @@ export default function ChatPage() {
         }
       } catch (error) {
         console.error("Error loading chats:", error);
+      } finally {
+        setIsLoadingChats(false);
       }
     };
 
     loadChats();
   }, []);
 
-  // Load chat history when chatId changes
+  // Load specific chat when chatId changes
   useEffect(() => {
     const loadChatHistory = async () => {
+      if (!params.chatId) return;
+
       try {
         const response = await fetch(`/api/chats/${params.chatId}`);
         if (response.ok) {
@@ -47,16 +53,21 @@ export default function ChatPage() {
             ...prev,
             [params.chatId as string]: chatData,
           }));
+        } else if (response.status === 404) {
+          // Chat doesn't exist, create a new one
+          console.log("Chat not found, will create new one on first message");
         }
       } catch (error) {
         console.error("Error loading chat history:", error);
       }
     };
 
-    if (params.chatId && !availableChats[params.chatId as string]) {
+    if (params.chatId && !isLoadingChats) {
       loadChatHistory();
     }
-  }, [params.chatId, availableChats]);
+  }, [params.chatId, isLoadingChats]);
+
+  const currentChat = availableChats[params.chatId as string];
 
   const {
     messages,
@@ -74,27 +85,47 @@ export default function ChatPage() {
       files: uploadedImages,
     },
     initialMessages:
-      availableChats[params.chatId as string]?.messages?.map((msg) => ({
-        ...msg,
+      currentChat?.messages?.map((msg, index) => ({
+        id: msg.id || `msg-${index}`,
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
         createdAt: new Date(msg.createdAt),
       })) || [],
     onFinish: (message) => {
       console.log("Chat finished:", message);
-      // Clear uploaded images after sending
       setUploadedImages([]);
-      if (
-        availableChats[params.chatId as string]?.title === "New Chat" &&
-        messages.length === 0
-      ) {
-        const firstMessage = input.slice(0, 30) + "...";
-        setAvailableChats((prev) => ({
-          ...prev,
-          [params.chatId as string]: {
-            ...prev[params.chatId as string],
-            title: firstMessage,
-          },
-        }));
-      }
+
+      const reloadChat = async () => {
+        try {
+          const response = await fetch(`/api/chats/${params.chatId}`);
+          if (response.ok) {
+            const chatData = await response.json();
+            setAvailableChats((prev) => ({
+              ...prev,
+              [params.chatId as string]: chatData,
+            }));
+          }
+        } catch (error) {
+          console.error("Error reloading chat:", error);
+        }
+      };
+
+      reloadChat();
+
+      // Also reload all chats to update the sidebar
+      const reloadAllChats = async () => {
+        try {
+          const response = await fetch("/api/chats");
+          if (response.ok) {
+            const chats = await response.json();
+            setAvailableChats(chats);
+          }
+        } catch (error) {
+          console.error("Error reloading all chats:", error);
+        }
+      };
+
+      setTimeout(reloadAllChats, 1000); // Delay to ensure the chat is saved
     },
     onError: (error) => {
       console.error("Chat error:", error);
@@ -146,21 +177,7 @@ export default function ChatPage() {
   const handleNewChat = () => {
     const newChatId = generateObjectId();
     setMessages([]);
-    setUploadedImages([]); // Clear images for new chat
-
-    const newChat: ChatItem = {
-      id: newChatId,
-      title: "New Chat",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      messages: [],
-    };
-
-    setAvailableChats((prev) => ({
-      ...prev,
-      [newChatId]: newChat,
-    }));
-
+    setUploadedImages([]);
     router.push(`/c/${newChatId}`);
   };
 
@@ -209,24 +226,56 @@ export default function ChatPage() {
         onDeleteChat={handleDeleteChat}
         isMobileMenuOpen={isMobileMenuOpen}
         onToggleMobileMenu={setIsMobileMenuOpen}
+        isLoading={isLoadingChats}
       />
       <div className="flex-1 flex flex-col relative">
+        {/* Chat Header */}
+        <div className="border-b border-neutral-700/50 p-4 bg-[#171717]">
+          <div className="flex items-center justify-between max-w-[800px] mx-auto">
+            <h1 className="text-white text-lg font-medium truncate">
+              {currentChat?.title || "New Chat"}
+            </h1>
+            <div className="text-neutral-400 text-sm">
+              {messages.length > 0 && `${messages.length} messages`}
+            </div>
+          </div>
+        </div>
+
         <div className="flex-1 overflow-hidden">
           <div className="h-full overflow-y-auto">
-            <div className="pb-[120px]">
+            <div className="pb-[120px] max-w-[800px] mx-auto">
+              {messages.length === 0 && !isLoading && (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center text-neutral-400">
+                    <h2 className="text-2xl font-semibold mb-2">
+                      Start a conversation
+                    </h2>
+                    <p>Send a message to begin chatting with ChatGPT</p>
+                  </div>
+                </div>
+              )}
+
               {messages.map((message: Message, index: number) => (
-                <ChatMessage key={index} message={message} />
+                <ChatMessage key={message.id || index} message={message} />
               ))}
+
               {error && (
-                <div className="text-red-500 text-center py-2">
-                  Error: {error.message}
+                <div className="text-red-500 text-center py-4 px-4">
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                    <strong>Error:</strong> {error.message}
+                  </div>
                 </div>
               )}
+
               {isLoading && (
-                <div className="text-white/70 text-center py-2">
-                  AI is thinking...
+                <div className="text-white/70 text-center py-4">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="animate-spin w-4 h-4 border-2 border-white/20 border-t-white/70 rounded-full"></div>
+                    ChatGPT is thinking...
+                  </div>
                 </div>
               )}
+
               <div ref={messagesEndRef} />
             </div>
           </div>
@@ -237,6 +286,27 @@ export default function ChatPage() {
             onSubmit={handleFormSubmit}
             className="w-full max-w-[800px] mx-auto px-4"
           >
+            {uploadedImages.length > 0 && (
+              <div className="mb-4 flex flex-wrap gap-2">
+                {uploadedImages.map((imageUrl, index) => (
+                  <div key={index} className="relative">
+                    <img
+                      src={imageUrl}
+                      alt={`Upload ${index + 1}`}
+                      className="w-16 h-16 object-cover rounded-lg border border-neutral-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleImageRemove(imageUrl)}
+                      className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="relative backdrop-blur-sm rounded-2xl border border-neutral-700/50 shadow-2xl shadow-black/20 transition-all duration-200 hover:border-neutral-600/50 focus-within:border-neutral-500/50">
               <Textarea
                 value={input}
@@ -249,6 +319,7 @@ export default function ChatPage() {
                 }}
                 placeholder="Message ChatGPT..."
                 className="w-full bg-[#1f1f1f] border-none text-white text-lg placeholder:text-neutral-400 focus-visible:ring-0 resize-none py-4 px-4 pr-20 min-h-[56px] max-h-96 transition-all duration-300 rounded-2xl"
+                disabled={isLoading}
               />
               <div className="absolute right-2 bottom-2.5 flex items-center gap-2">
                 <ImageUpload

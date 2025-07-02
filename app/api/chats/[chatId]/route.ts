@@ -5,9 +5,10 @@ import connectToDatabase from "@/lib/db";
 
 export async function GET(
   req: Request,
-  { params }: { params: { chatId: string } }
+  { params }: { params: Promise<{ chatId: string }> }
 ) {
   try {
+    const { chatId } = await params;
     const user = await currentUser();
     const userId = user?.id;
 
@@ -20,7 +21,7 @@ export async function GET(
 
     await connectToDatabase();
 
-    const chat = await Chat.findOne({ _id: params.chatId, userId });
+    const chat = await Chat.findOne({ _id: chatId, userId });
 
     if (!chat) {
       return NextResponse.json(
@@ -44,9 +45,10 @@ export async function GET(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { chatId: string } }
+  { params }: { params: Promise<{ chatId: string }> }
 ) {
   try {
+    const { chatId } = await params;
     const user = await currentUser();
     const userId = user?.id;
 
@@ -59,7 +61,7 @@ export async function DELETE(
 
     await connectToDatabase();
 
-    const result = await Chat.deleteOne({ _id: params.chatId, userId });
+    const result = await Chat.deleteOne({ _id: chatId, userId });
 
     if (result.deletedCount === 0) {
       return NextResponse.json(

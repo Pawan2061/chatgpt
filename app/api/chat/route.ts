@@ -9,45 +9,48 @@ export async function POST(req: Request) {
     const { messages, chatId, files } = await req.json();
     const userId = "test-user";
 
+    console.log("=== Chat API Request ===");
+    console.log("ChatId:", chatId);
+    console.log("Messages received:", messages?.length);
+    console.log("Files:", files?.length || 0);
+
     await connectDB();
 
     let chat;
 
-    try {
-      if (mongoose.Types.ObjectId.isValid(chatId)) {
-        chat = await Chat.findOne({ _id: chatId, userId });
-      }
-    } catch (error) {
-      console.log("Error finding chat:", error);
+    // Try to find existing chat by chatId
+    if (mongoose.Types.ObjectId.isValid(chatId)) {
+      chat = await Chat.findOne({ _id: chatId, userId });
+      console.log(
+        "Found existing chat:",
+        !!chat,
+        "with",
+        chat?.messages?.length || 0,
+        "messages"
+      );
     }
 
+    // Create new chat if it doesn't exist
     if (!chat) {
-      try {
-        chat = new Chat({
-          _id: new mongoose.Types.ObjectId(),
-          userId,
-          messages: [],
-          title: "New Chat",
-        });
-      } catch (error) {
-        console.error("Error creating new chat:", error);
-        return new Response(
-          JSON.stringify({
-            error: "Failed to create chat",
-            details: error instanceof Error ? error.message : "Unknown error",
-          }),
-          {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          }
-        );
-      }
+      console.log("Creating new chat with ID:", chatId);
+      chat = new Chat({
+        _id: new mongoose.Types.ObjectId(chatId),
+        userId,
+        messages: [],
+        title: "New Chat",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      await chat.save();
+      console.log("New chat created successfully");
     }
 
-    const lastMessage = messages[messages.length - 1];
-    const messageContent = lastMessage?.content || "";
+    // Get the current user message (last message from the client)
+    const currentUserMessage = messages[messages.length - 1];
+    const messageContent = currentUserMessage?.content || "";
     const hasImages = files && Array.isArray(files) && files.length > 0;
 
+    // Validate message content
     if (!messageContent.trim() && !hasImages) {
       return new Response(
         JSON.stringify({
@@ -61,6 +64,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // Add the new user message to the chat
     const userMessage: IMessage = {
       role: "user",
       content: messageContent || "Please analyze the uploaded image(s)",
@@ -71,51 +75,115 @@ export async function POST(req: Request) {
 
     chat.messages.push(userMessage);
 
-    const openAIMessages = [
+    // Update chat title if it's still "New Chat" and this is the first user message
+    if (chat.title === "New Chat" && messageContent.trim()) {
+      chat.title =
+        messageContent.slice(0, 50) + (messageContent.length > 50 ? "..." : "");
+    }
+
+    console.log(
+      "User message added. Total messages in chat:",
+      chat.messages.length
+    );
+
+    // Prepare messages for OpenAI API using the complete chat history
+    const openAIMessages: Array<{
+      role: "system" | "user" | "assistant";
+      content:
+        | string
+        | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+    }> = [
       {
-        role: "system" as const,
+        role: "system",
         content:
           "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using Markdown.",
       },
     ];
 
-    messages.forEach((msg: { role: string; content: string }) => {
-      if (msg.role === "user" || msg.role === "assistant") {
+    // Add all messages from the chat history
+    for (const msg of chat.messages) {
+      if (msg.role === "user") {
+        if (msg.files && msg.files.length > 0) {
+          // Handle multimodal user messages
+          const content = [];
+          if (msg.content.trim()) {
+            content.push({ type: "text", text: msg.content });
+          }
+          msg.files.forEach((imageUrl: string) => {
+            content.push({
+              type: "image_url",
+              image_url: { url: imageUrl },
+            });
+          });
+          openAIMessages.push({
+            role: "user",
+            content: content,
+          });
+        } else {
+          // Text-only user message
+          openAIMessages.push({
+            role: "user",
+            content: msg.content,
+          });
+        }
+      } else if (msg.role === "assistant") {
         openAIMessages.push({
-          role: msg.role as "user" | "assistant",
+          role: "assistant",
           content: msg.content,
         });
       }
-    });
-
-    if (hasImages) {
-      const content = [];
-
-      if (messageContent.trim()) {
-        content.push({ type: "text", text: messageContent });
-      }
-
-      files.forEach((imageUrl: string) => {
-        content.push({
-          type: "image_url",
-          image_url: { url: imageUrl },
-        });
-      });
-
-      openAIMessages[openAIMessages.length - 1] = {
-        role: "user" as const,
-        content: content,
-      };
     }
+
+    console.log("Prepared", openAIMessages.length, "messages for OpenAI API");
+
+    // Determine which model to use based on whether any message in the conversation has images
+    const hasAnyImages = chat.messages.some(
+      (msg) => msg.files && msg.files.length > 0
+    );
+    const modelToUse = hasAnyImages ? "gpt-4-vision-preview" : "gpt-4-turbo";
+
+    console.log("Using model:", modelToUse);
+
+    // Request the OpenAI API for the response
     const response = await streamText({
-      model: openai(hasImages ? "gpt-4-vision-preview" : "gpt-4-turbo"),
+      model: openai(modelToUse),
       messages: openAIMessages as any,
       temperature: 0.7,
       maxTokens: 4000,
+      onFinish: async (result) => {
+        try {
+          console.log("=== Response Finished ===");
+          console.log("Assistant response length:", result.text.length);
+
+          // Add assistant response to chat
+          const assistantMessage: IMessage = {
+            role: "assistant",
+            content: result.text,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+
+          // Reload the chat to ensure we have the latest version
+          const updatedChat = await Chat.findOne({ _id: chatId, userId });
+          if (updatedChat) {
+            updatedChat.messages.push(assistantMessage);
+            updatedChat.updatedAt = new Date();
+            await updatedChat.save();
+            console.log(
+              "Assistant message saved. Total messages now:",
+              updatedChat.messages.length
+            );
+          }
+        } catch (error) {
+          console.error("Error saving assistant response:", error);
+        }
+      },
     });
 
+    // Save the chat with the user message
     try {
       await chat.save();
+      console.log("Chat saved with user message");
     } catch (error) {
       console.error("Error saving chat:", error);
     }
