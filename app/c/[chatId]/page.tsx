@@ -19,6 +19,7 @@ export default function ChatPage() {
   >({});
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isLoadingChats, setIsLoadingChats] = useState(true);
+  const [isEditingMessage, setIsEditingMessage] = useState(false);
 
   // Load all chats on initial load
   useEffect(() => {
@@ -93,6 +94,7 @@ export default function ChatPage() {
     onFinish: (message) => {
       console.log("Chat finished:", message);
       setUploadedFiles([]);
+      setIsEditingMessage(false);
 
       const reloadChat = async () => {
         try {
@@ -128,6 +130,7 @@ export default function ChatPage() {
     },
     onError: (error) => {
       console.error("Chat error:", error);
+      setIsEditingMessage(false);
     },
   });
 
@@ -149,6 +152,159 @@ export default function ChatPage() {
       await handleSubmit(e);
     } catch (error) {
       console.error("Error submitting message:", error);
+    }
+  };
+
+  // Handle message editing
+  const handleEditMessage = async (
+    messageIndex: number,
+    newContent: string
+  ) => {
+    if (!params.chatId || isEditingMessage) return;
+
+    try {
+      setIsEditingMessage(true);
+      console.log(
+        "Editing message at index:",
+        messageIndex,
+        "with content:",
+        newContent
+      );
+
+      // Update the message in the local state immediately
+      const updatedMessages = [...messages];
+      updatedMessages[messageIndex] = {
+        ...updatedMessages[messageIndex],
+        content: newContent,
+      };
+
+      // Remove messages after the edited one
+      const messagesUpToEdit = updatedMessages.slice(0, messageIndex + 1);
+      setMessages(messagesUpToEdit);
+
+      const response = await fetch("/api/edit-message", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chatId: params.chatId,
+          messageIndex,
+          newContent,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to edit message: ${response.status}`);
+      }
+
+      // Handle streaming response for the new assistant message
+      const reader = response.body?.getReader();
+      if (reader) {
+        let assistantMessage = "";
+        const assistantMessageObj: Message = {
+          id: `edit-response-${Date.now()}`,
+          role: "assistant",
+          content: "",
+          createdAt: new Date(),
+        };
+
+        // Add the empty assistant message to show loading
+        setMessages((prev) => [...prev, assistantMessageObj]);
+
+        try {
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              console.log("Streaming completed");
+              setIsEditingMessage(false);
+              break;
+            }
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split("\n").filter((line) => line.trim());
+
+            for (const line of lines) {
+              if (line.startsWith("0:")) {
+                try {
+                  const jsonStr = line.slice(2);
+                  const data = JSON.parse(jsonStr);
+
+                  if (data.type === "text-delta" && data.textDelta) {
+                    assistantMessage += data.textDelta;
+                    setMessages((prev) => {
+                      const updated = [...prev];
+                      const lastIndex = updated.length - 1;
+                      if (lastIndex >= 0) {
+                        updated[lastIndex] = {
+                          ...updated[lastIndex],
+                          content: assistantMessage,
+                        };
+                      }
+                      return updated;
+                    });
+                  } else if (data.type === "finish") {
+                    console.log("Stream finished");
+                    setIsEditingMessage(false);
+                  }
+                } catch (parseError) {
+                  console.log("Parse error for line:", line, parseError);
+                  // Continue processing other lines
+                }
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock();
+          setIsEditingMessage(false);
+        }
+      } else {
+        // No streaming body, just wait and reload
+        setIsEditingMessage(false);
+      }
+
+      // Reload chat data after editing to get the complete updated conversation
+      setTimeout(async () => {
+        try {
+          const chatResponse = await fetch(`/api/chats/${params.chatId}`);
+          if (chatResponse.ok) {
+            const chatData = await chatResponse.json();
+            setAvailableChats((prev) => ({
+              ...prev,
+              [params.chatId as string]: chatData,
+            }));
+
+            // Update messages with the fresh data
+            const freshMessages =
+              chatData.messages?.map(
+                (
+                  msg: {
+                    id?: string;
+                    role: string;
+                    content: string;
+                    createdAt: string;
+                  },
+                  index: number
+                ) => ({
+                  id: msg.id || `msg-${index}`,
+                  role: msg.role as "user" | "assistant",
+                  content: msg.content,
+                  createdAt: new Date(msg.createdAt),
+                })
+              ) || [];
+
+            setMessages(freshMessages);
+            console.log("Chat reloaded with", freshMessages.length, "messages");
+          }
+        } catch (error) {
+          console.error("Error reloading chat after edit:", error);
+        }
+      }, 2000); // Give more time for the backend to finish
+    } catch (error) {
+      console.error("Error editing message:", error);
+      setIsEditingMessage(false);
     }
   };
 
@@ -247,7 +403,12 @@ export default function ChatPage() {
               )}
 
               {messages.map((message: Message, index: number) => (
-                <ChatMessage key={message.id || index} message={message} />
+                <ChatMessage
+                  key={message.id || index}
+                  message={message}
+                  messageIndex={index}
+                  onEditMessage={handleEditMessage}
+                />
               ))}
 
               {error && (
@@ -258,11 +419,13 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {isLoading && (
+              {(isLoading || isEditingMessage) && (
                 <div className="text-white/70 text-center py-4">
                   <div className="flex items-center justify-center gap-2">
                     <div className="animate-spin w-4 h-4 border-2 border-white/20 border-t-white/70 rounded-full"></div>
-                    ChatGPT is thinking...
+                    {isEditingMessage
+                      ? "Regenerating response..."
+                      : "ChatGPT is thinking..."}
                   </div>
                 </div>
               )}
@@ -289,19 +452,21 @@ export default function ChatPage() {
                 }}
                 placeholder="Message ChatGPT..."
                 className="w-full bg-[#1f1f1f] border-none text-white text-lg placeholder:text-neutral-400 focus-visible:ring-0 resize-none py-4 px-4 pr-20 min-h-[56px] max-h-96 transition-all duration-300 rounded-2xl"
-                disabled={isLoading}
+                disabled={isLoading || isEditingMessage}
               />
               <div className="absolute right-2 bottom-2.5 flex items-center gap-2">
                 <FileUpload
                   onFileUpload={handleFileUpload}
                   onFileRemove={handleFileRemove}
                   uploadedFiles={uploadedFiles}
-                  disabled={isLoading}
+                  disabled={isLoading || isEditingMessage}
                 />
                 <button
                   type="submit"
                   disabled={
-                    isLoading || (!input.trim() && uploadedFiles.length === 0)
+                    isLoading ||
+                    isEditingMessage ||
+                    (!input.trim() && uploadedFiles.length === 0)
                   }
                   className="p-1 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >

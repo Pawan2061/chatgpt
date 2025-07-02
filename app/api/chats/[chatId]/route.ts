@@ -9,8 +9,8 @@ export async function GET(
 ) {
   try {
     const { chatId } = await params;
-    const user = await currentUser();
-    const userId = user?.id || "anonymous-user"; // Fallback for development
+    // const user = await currentUser();
+    const userId = "test-user"; // Fallback for development
 
     console.log("GET chat request - ChatId:", chatId, "UserId:", userId);
 

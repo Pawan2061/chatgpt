@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     const userId = "test-user"; // const user = await currentUser();
     console.log("=== Chat API Request ===");
     console.log("ChatId:", chatId);
-    console.log("Messages received:", messages?.length);
+    console.log("Messages received:", messages?.length || 0);
     console.log("Files:", files?.length || 0);
     console.log("User ID:", userId);
 
@@ -82,7 +82,9 @@ export async function POST(req: Request) {
     }
 
     // Get the current user message (last message from the client)
-    const currentUserMessage = messages[messages.length - 1];
+    // The useChat hook sends all messages, we need the last one
+    const currentUserMessage =
+      messages && messages.length > 0 ? messages[messages.length - 1] : null;
     const messageContent = currentUserMessage?.content || "";
     const hasFiles = files && Array.isArray(files) && files.length > 0;
 

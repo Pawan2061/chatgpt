@@ -94,13 +94,11 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("File validation passed, converting to buffer...");
-    // Convert file to buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     console.log("Buffer created, size:", buffer.length);
 
     console.log("Starting Cloudinary upload...");
-    // Upload to Cloudinary
     const result = await new Promise<UploadApiResponse>((resolve, reject) => {
       cloudinary.uploader
         .upload_stream(
