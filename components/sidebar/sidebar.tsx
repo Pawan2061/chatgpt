@@ -368,6 +368,14 @@ export function ChatSidebar({
         onNewChat={onNewChat}
       />
 
+      {/* Mobile Backdrop Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
+          onClick={() => onToggleMobileMenu(false)}
+        />
+      )}
+
       <div
         className={`${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
