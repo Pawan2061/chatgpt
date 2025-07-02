@@ -198,7 +198,6 @@ export default function ChatPage() {
         throw new Error(`Failed to edit message: ${response.status}`);
       }
 
-      // Handle streaming response for the new assistant message
       const reader = response.body?.getReader();
       if (reader) {
         let assistantMessage = "";
@@ -209,7 +208,6 @@ export default function ChatPage() {
           createdAt: new Date(),
         };
 
-        // Add the empty assistant message to show loading
         setMessages((prev) => [...prev, assistantMessageObj]);
 
         try {
@@ -251,7 +249,6 @@ export default function ChatPage() {
                   }
                 } catch (parseError) {
                   console.log("Parse error for line:", line, parseError);
-                  // Continue processing other lines
                 }
               }
             }
@@ -261,11 +258,9 @@ export default function ChatPage() {
           setIsEditingMessage(false);
         }
       } else {
-        // No streaming body, just wait and reload
         setIsEditingMessage(false);
       }
 
-      // Reload chat data after editing to get the complete updated conversation
       setTimeout(async () => {
         try {
           const chatResponse = await fetch(`/api/chats/${params.chatId}`);
@@ -276,7 +271,6 @@ export default function ChatPage() {
               [params.chatId as string]: chatData,
             }));
 
-            // Update messages with the fresh data
             const freshMessages =
               chatData.messages?.map(
                 (
@@ -301,7 +295,7 @@ export default function ChatPage() {
         } catch (error) {
           console.error("Error reloading chat after edit:", error);
         }
-      }, 2000); // Give more time for the backend to finish
+      }, 2000);
     } catch (error) {
       console.error("Error editing message:", error);
       setIsEditingMessage(false);
@@ -313,8 +307,6 @@ export default function ChatPage() {
   }, [messages]);
 
   const handleNewChat = () => {
-    // Generate a proper MongoDB ObjectId format
-    // This mimics MongoDB ObjectId generation: 12-byte identifier as 24-character hex string
     const timestamp = Math.floor(Date.now() / 1000)
       .toString(16)
       .padStart(8, "0");

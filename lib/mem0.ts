@@ -1,10 +1,11 @@
 import { MemoryClient } from "mem0ai";
 
 const mem0Client = new MemoryClient({
-  apiKey: process.env.MEM0_API_KEY || "",
+  apiKey: process.env.NEXT_PUBLIC_MEM0_API_KEY || "",
 });
 
 export interface MemorySearchResult {
+  id: string;
   memory: string;
   score: number;
   metadata?: Record<string, unknown>;
@@ -37,8 +38,11 @@ interface ChatMessage {
   updatedAt?: Date;
 }
 
+/**
+ * Add memories to Mem0 from conversation context
+ */
 export async function addMemory(
-  messages: string | ChatMessage[],
+  text: string,
   options: MemoryAddOptions
 ): Promise<void> {
   try {
@@ -47,9 +51,18 @@ export async function addMemory(
     console.log("Adding memory to Mem0:", {
       userId,
       chatId,
-      messagesCount: Array.isArray(messages) ? messages.length : 1,
+      textLength: text.length,
     });
 
+    // Convert text to the message format expected by mem0 API
+    const messages = [
+      {
+        role: "user" as const,
+        content: text,
+      },
+    ];
+
+    // Add memory using mem0 API
     await mem0Client.add(messages, {
       user_id: userId,
       metadata: {
@@ -62,6 +75,7 @@ export async function addMemory(
     console.log("Memory added successfully");
   } catch (error) {
     console.error("Error adding memory:", error);
+    // Don't throw error to avoid breaking chat flow
   }
 }
 
@@ -87,6 +101,7 @@ export async function searchMemories(
     const filteredResults: MemorySearchResult[] = response
       .filter((result: MemoryApiResponse) => result.score >= threshold)
       .map((result: MemoryApiResponse) => ({
+        id: result.id || "",
         memory: result.memory,
         score: result.score,
         metadata: result.metadata,
@@ -114,6 +129,7 @@ export async function getChatMemories(
         (memory: MemoryApiResponse) => memory.metadata?.chat_id === chatId
       )
       .map((memory: MemoryApiResponse) => ({
+        id: memory.id || "",
         memory: memory.memory,
         score: 1.0,
         metadata: memory.metadata,
