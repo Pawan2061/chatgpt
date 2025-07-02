@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { Message, useChat } from "ai/react";
 import { ChatSidebar } from "@/components/sidebar/sidebar";
+import { Navbar } from "@/components/layout/navbar";
 import { Textarea } from "@/components/ui/textarea";
 import { ChatItem } from "@/types/type";
 import { ChatMessage } from "@/components/chat/chat-message";
@@ -21,7 +22,6 @@ export default function ChatPage() {
   const [isLoadingChats, setIsLoadingChats] = useState(true);
   const [isEditingMessage, setIsEditingMessage] = useState(false);
 
-  // Load all chats on initial load
   useEffect(() => {
     const loadChats = async () => {
       try {
@@ -42,6 +42,41 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialMessage = urlParams.get("message");
+    const initialFiles = urlParams.get("files");
+
+    if (initialMessage || initialFiles) {
+      if (initialMessage) {
+        handleInputChange({
+          target: { value: initialMessage },
+        } as React.ChangeEvent<HTMLTextAreaElement>);
+      }
+      if (initialFiles) {
+        try {
+          const files = JSON.parse(initialFiles);
+          setUploadedFiles(files);
+        } catch (error) {
+          console.error("Error parsing initial files:", error);
+        }
+      }
+
+      setTimeout(() => {
+        if (initialMessage || initialFiles) {
+          const form = document.querySelector("form");
+          if (form) {
+            form.dispatchEvent(
+              new Event("submit", { bubbles: true, cancelable: true })
+            );
+          }
+        }
+      }, 500);
+
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [params.chatId]);
+
+  useEffect(() => {
     const loadChatHistory = async () => {
       if (!params.chatId) return;
 
@@ -54,7 +89,6 @@ export default function ChatPage() {
             [params.chatId as string]: chatData,
           }));
         } else if (response.status === 404) {
-          // Chat doesn't exist, create a new one
           console.log("Chat not found, will create new one on first message");
         }
       } catch (error) {
@@ -367,18 +401,11 @@ export default function ChatPage() {
         onToggleMobileMenu={setIsMobileMenuOpen}
         isLoading={isLoadingChats}
       />
+
+      {/* Main content area with navbar */}
       <div className="flex-1 flex flex-col relative">
-        {/* Chat Header */}
-        <div className="border-b border-neutral-700/50 p-4 bg-[#171717]">
-          <div className="flex items-center justify-between max-w-[800px] mx-auto">
-            <h1 className="text-white text-lg font-medium truncate">
-              {currentChat?.title || "New Chat"}
-            </h1>
-            <div className="text-neutral-400 text-sm">
-              {messages.length > 0 && `${messages.length} messages`}
-            </div>
-          </div>
-        </div>
+        {/* Navbar only spans the main content area */}
+        <Navbar />
 
         <div className="flex-1 overflow-hidden">
           <div className="h-full overflow-y-auto">
@@ -425,62 +452,62 @@ export default function ChatPage() {
               <div ref={messagesEndRef} />
             </div>
           </div>
-        </div>
 
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#171717] via-[#171717] to-transparent pt-6 pb-6">
-          <form
-            onSubmit={handleFormSubmit}
-            className="w-full max-w-[800px] mx-auto px-4"
-          >
-            <div className="relative backdrop-blur-sm rounded-2xl border border-neutral-700/50 shadow-2xl shadow-black/20 transition-all duration-200 hover:border-neutral-600/50 focus-within:border-neutral-500/50">
-              <Textarea
-                value={input}
-                onChange={handleInputChange}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleFormSubmit(e);
-                  }
-                }}
-                placeholder="Message ChatGPT..."
-                className="w-full bg-[#1f1f1f] border-none text-white text-lg placeholder:text-neutral-400 focus-visible:ring-0 resize-none py-4 px-4 pr-20 min-h-[56px] max-h-96 transition-all duration-300 rounded-2xl"
-                disabled={isLoading || isEditingMessage}
-              />
-              <div className="absolute right-2 bottom-2.5 flex items-center gap-2">
-                <FileUpload
-                  onFileUpload={handleFileUpload}
-                  onFileRemove={handleFileRemove}
-                  uploadedFiles={uploadedFiles}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#171717] via-[#171717] to-transparent pt-6 pb-6">
+            <form
+              onSubmit={handleFormSubmit}
+              className="w-full max-w-[800px] mx-auto px-4"
+            >
+              <div className="relative backdrop-blur-sm rounded-2xl border border-neutral-700/50 shadow-2xl shadow-black/20 transition-all duration-200 hover:border-neutral-600/50 focus-within:border-neutral-500/50">
+                <Textarea
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleFormSubmit(e);
+                    }
+                  }}
+                  placeholder="Message ChatGPT..."
+                  className="w-full bg-[#1f1f1f] border-none text-white text-lg placeholder:text-neutral-400 focus-visible:ring-0 resize-none py-4 px-4 pr-20 min-h-[56px] max-h-96 transition-all duration-300 rounded-2xl"
                   disabled={isLoading || isEditingMessage}
                 />
-                <button
-                  type="submit"
-                  disabled={
-                    isLoading ||
-                    isEditingMessage ||
-                    (!input.trim() && uploadedFiles.length === 0)
-                  }
-                  className="p-1 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    className="text-neutral-400 hover:text-white transition-colors"
+                <div className="absolute right-2 bottom-2.5 flex items-center gap-2">
+                  <FileUpload
+                    onFileUpload={handleFileUpload}
+                    onFileRemove={handleFileRemove}
+                    uploadedFiles={uploadedFiles}
+                    disabled={isLoading || isEditingMessage}
+                  />
+                  <button
+                    type="submit"
+                    disabled={
+                      isLoading ||
+                      isEditingMessage ||
+                      (!input.trim() && uploadedFiles.length === 0)
+                    }
+                    className="p-1 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <path
-                      d="M7 11L12 6L17 11M12 18V7"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      className="text-neutral-400 hover:text-white transition-colors"
+                    >
+                      <path
+                        d="M7 11L12 6L17 11M12 18V7"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       </div>
     </div>
