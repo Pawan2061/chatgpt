@@ -9,7 +9,7 @@ import mongoose from "mongoose";
 
 export async function POST(req: Request) {
   try {
-    const { messages, chatId } = await req.json();
+    const { messages, chatId, files } = await req.json();
     const userId = "test-user";
 
     if (!userId) {
@@ -62,29 +62,92 @@ export async function POST(req: Request) {
       }
     }
 
+    // Get the last message content and handle empty content
+    const lastMessage = messages[messages.length - 1];
+    const messageContent = lastMessage?.content || "";
+    const hasImages = files && files.length > 0;
+
+    // If no content and no images, return error
+    if (!messageContent.trim() && !hasImages) {
+      return new Response(
+        JSON.stringify({
+          error: "Empty message",
+          details: "Please provide text or images",
+        }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Create user message with appropriate content
     const userMessage: IMessage = {
       role: "user",
-      content: messages[messages.length - 1].content,
+      content: messageContent || "Please analyze the uploaded image(s)",
+      files: files || [],
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
     chat.messages.push(userMessage);
 
+    // Prepare messages for OpenAI API
+    const openAIMessages: any[] = [
+      {
+        role: "system",
+        content:
+          "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using Markdown. If the user provides images, analyze them and respond accordingly. If only images are provided without text, provide a detailed description and analysis of the images.",
+      },
+    ];
+
+    // Add conversation history (exclude the current message first)
+    for (let i = 0; i < messages.length - 1; i++) {
+      const msg = messages[i];
+      openAIMessages.push({
+        role: msg.role,
+        content: msg.content,
+      });
+    }
+
+    // Add the current user message with images if present
+    if (hasImages) {
+      const content = [];
+
+      // Add text if present
+      if (messageContent.trim()) {
+        content.push({ type: "text", text: messageContent });
+      }
+
+      // Add images
+      files.forEach((imageUrl: string) => {
+        content.push({
+          type: "image_url",
+          image_url: { url: imageUrl },
+        });
+      });
+
+      openAIMessages.push({
+        role: "user",
+        content: content,
+      });
+    } else {
+      // Text-only message
+      openAIMessages.push({
+        role: "user",
+        content: messageContent,
+      });
+    }
+
     // Request the OpenAI API for the response
     const response = await streamText({
-      model: openai("gpt-4-turbo-preview"),
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using Markdown.",
-        },
-        ...messages,
-      ],
+      model: openai("gpt-4-vision-preview"), // Using vision model for image support
+      messages: openAIMessages,
       temperature: 0.7,
+      maxTokens: 4000,
     });
 
+    // Save the chat after getting response
     const assistantMessage: IMessage = {
       role: "assistant",
       content: "Processing...",

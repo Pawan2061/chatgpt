@@ -27,7 +27,10 @@ const MessageSchema = new Schema<IMessage>(
       type: String,
       required: true,
     },
-    files: [String],
+    files: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true }
 );

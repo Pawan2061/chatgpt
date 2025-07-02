@@ -7,6 +7,7 @@ import { ChatSidebar } from "@/components/sidebar/sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { ChatItem } from "@/types/type";
 import { ChatMessage } from "@/components/chat/chat-message";
+import { ImageUpload } from "@/components/ui/image-upload";
 
 export default function ChatPage() {
   const params = useParams();
@@ -16,6 +17,7 @@ export default function ChatPage() {
   const [availableChats, setAvailableChats] = useState<
     Record<string, ChatItem>
   >({});
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
 
   // Load all chats on initial load
   useEffect(() => {
@@ -69,10 +71,17 @@ export default function ChatPage() {
     id: params.chatId as string,
     body: {
       chatId: params.chatId,
+      files: uploadedImages,
     },
-    initialMessages: availableChats[params.chatId as string]?.messages || [],
+    initialMessages:
+      availableChats[params.chatId as string]?.messages?.map((msg) => ({
+        ...msg,
+        createdAt: new Date(msg.createdAt),
+      })) || [],
     onFinish: (message) => {
       console.log("Chat finished:", message);
+      // Clear uploaded images after sending
+      setUploadedImages([]);
       if (
         availableChats[params.chatId as string]?.title === "New Chat" &&
         messages.length === 0
@@ -94,9 +103,18 @@ export default function ChatPage() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+
+    // Allow submission if there's text input OR uploaded images
+    const hasText = input.trim().length > 0;
+    const hasImages = uploadedImages.length > 0;
+
+    if (!hasText && !hasImages) {
+      return; // Don't submit if neither text nor images
+    }
 
     console.log("Submitting message:", input);
+    console.log("With images:", uploadedImages);
+
     try {
       await handleSubmit(e);
     } catch (error) {
@@ -128,6 +146,7 @@ export default function ChatPage() {
   const handleNewChat = () => {
     const newChatId = generateObjectId();
     setMessages([]);
+    setUploadedImages([]); // Clear images for new chat
 
     const newChat: ChatItem = {
       id: newChatId,
@@ -169,6 +188,14 @@ export default function ChatPage() {
     } catch (error) {
       console.error("Error deleting chat:", error);
     }
+  };
+
+  const handleImageUpload = (imageUrl: string) => {
+    setUploadedImages((prev) => [...prev, imageUrl]);
+  };
+
+  const handleImageRemove = (imageUrl: string) => {
+    setUploadedImages((prev) => prev.filter((url) => url !== imageUrl));
   };
 
   return (
@@ -223,10 +250,18 @@ export default function ChatPage() {
                 placeholder="Message ChatGPT..."
                 className="w-full bg-[#1f1f1f] border-none text-white text-lg placeholder:text-neutral-400 focus-visible:ring-0 resize-none py-4 px-4 pr-20 min-h-[56px] max-h-96 transition-all duration-300 rounded-2xl"
               />
-              <div className="absolute right-2 bottom-2.5">
+              <div className="absolute right-2 bottom-2.5 flex items-center gap-2">
+                <ImageUpload
+                  onImageUpload={handleImageUpload}
+                  onImageRemove={handleImageRemove}
+                  uploadedImages={uploadedImages}
+                  disabled={isLoading}
+                />
                 <button
                   type="submit"
-                  disabled={isLoading || !input.trim()}
+                  disabled={
+                    isLoading || (!input.trim() && uploadedImages.length === 0)
+                  }
                   className="p-1 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg
