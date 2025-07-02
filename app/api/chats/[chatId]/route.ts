@@ -11,12 +11,12 @@ export async function GET(
     const user = await currentUser();
     const userId = user?.id;
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized", details: "User not authenticated" },
-        { status: 401 }
-      );
-    }
+    // if (!userId) {
+    //   return NextResponse.json(
+    //     { error: "Unauthorized", details: "User not authenticated" },
+    //     { status: 401 }
+    //   );
+    // }
 
     await connectToDatabase();
 

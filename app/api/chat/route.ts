@@ -3,33 +3,16 @@ import { openai } from "@ai-sdk/openai";
 import { Chat, IMessage } from "@/lib/models/chat";
 import connectDB from "@/lib/db";
 import mongoose from "mongoose";
-// import { currentUser } from "@clerk/nextjs/server";
-
-// Create an OpenAI API client
 
 export async function POST(req: Request) {
   try {
     const { messages, chatId, files } = await req.json();
     const userId = "test-user";
 
-    if (!userId) {
-      return new Response(
-        JSON.stringify({
-          error: "Unauthorized",
-          details: "User not authenticated",
-        }),
-        {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-
     await connectDB();
 
     let chat;
 
-    // Try to find existing chat
     try {
       if (mongoose.Types.ObjectId.isValid(chatId)) {
         chat = await Chat.findOne({ _id: chatId, userId });
@@ -38,7 +21,6 @@ export async function POST(req: Request) {
       console.log("Error finding chat:", error);
     }
 
-    // Create new chat if it doesn't exist
     if (!chat) {
       try {
         chat = new Chat({
@@ -62,12 +44,10 @@ export async function POST(req: Request) {
       }
     }
 
-    // Get the last message content and handle empty content
     const lastMessage = messages[messages.length - 1];
     const messageContent = lastMessage?.content || "";
-    const hasImages = files && files.length > 0;
+    const hasImages = files && Array.isArray(files) && files.length > 0;
 
-    // If no content and no images, return error
     if (!messageContent.trim() && !hasImages) {
       return new Response(
         JSON.stringify({
@@ -81,7 +61,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Create user message with appropriate content
     const userMessage: IMessage = {
       role: "user",
       content: messageContent || "Please analyze the uploaded image(s)",
@@ -92,34 +71,30 @@ export async function POST(req: Request) {
 
     chat.messages.push(userMessage);
 
-    // Prepare messages for OpenAI API
-    const openAIMessages: any[] = [
+    const openAIMessages = [
       {
-        role: "system",
+        role: "system" as const,
         content:
-          "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using Markdown. If the user provides images, analyze them and respond accordingly. If only images are provided without text, provide a detailed description and analysis of the images.",
+          "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using Markdown.",
       },
     ];
 
-    // Add conversation history (exclude the current message first)
-    for (let i = 0; i < messages.length - 1; i++) {
-      const msg = messages[i];
-      openAIMessages.push({
-        role: msg.role,
-        content: msg.content,
-      });
-    }
+    messages.forEach((msg: { role: string; content: string }) => {
+      if (msg.role === "user" || msg.role === "assistant") {
+        openAIMessages.push({
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+        });
+      }
+    });
 
-    // Add the current user message with images if present
     if (hasImages) {
       const content = [];
 
-      // Add text if present
       if (messageContent.trim()) {
         content.push({ type: "text", text: messageContent });
       }
 
-      // Add images
       files.forEach((imageUrl: string) => {
         content.push({
           type: "image_url",
@@ -127,36 +102,23 @@ export async function POST(req: Request) {
         });
       });
 
-      openAIMessages.push({
-        role: "user",
+      openAIMessages[openAIMessages.length - 1] = {
+        role: "user" as const,
         content: content,
-      });
-    } else {
-      // Text-only message
-      openAIMessages.push({
-        role: "user",
-        content: messageContent,
-      });
+      };
     }
-
-    // Request the OpenAI API for the response
     const response = await streamText({
-      model: openai("gpt-4-vision-preview"), // Using vision model for image support
-      messages: openAIMessages,
+      model: openai(hasImages ? "gpt-4-vision-preview" : "gpt-4-turbo"),
+      messages: openAIMessages as any,
       temperature: 0.7,
       maxTokens: 4000,
     });
 
-    // Save the chat after getting response
-    const assistantMessage: IMessage = {
-      role: "assistant",
-      content: "Processing...",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    chat.messages.push(assistantMessage);
-    await chat.save();
+    try {
+      await chat.save();
+    } catch (error) {
+      console.error("Error saving chat:", error);
+    }
 
     return response.toDataStreamResponse();
   } catch (error) {
