@@ -41,14 +41,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // Update the message content
     chat.messages[messageIndex].content = newContent;
     chat.messages[messageIndex].updatedAt = new Date();
 
-    // Remove all messages after the edited message (they will be regenerated)
     chat.messages = chat.messages.slice(0, messageIndex + 1);
 
-    // Prepare messages for OpenAI API
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const openAIMessages: any[] = [];
 
@@ -59,7 +56,6 @@ export async function POST(req: Request) {
         "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using Markdown. When analyzing images, provide detailed and helpful descriptions and answers.",
     });
 
-    // Add all messages from the chat history up to and including the edited message
     for (const msg of chat.messages) {
       if (msg.role === "user") {
         openAIMessages.push({
@@ -76,10 +72,8 @@ export async function POST(req: Request) {
 
     console.log("Prepared", openAIMessages.length, "messages for OpenAI API");
 
-    // Determine model to use (simplified for editing - no file handling for now)
     const modelToUse = "gpt-4o-mini";
 
-    // Request the OpenAI API for the response
     const response = await streamText({
       model: openai(modelToUse),
       messages: openAIMessages,
@@ -90,7 +84,6 @@ export async function POST(req: Request) {
           console.log("=== Edit Response Finished ===");
           console.log("Assistant response length:", result.text.length);
 
-          // Add new assistant response to chat
           const assistantMessage: IMessage = {
             role: "assistant",
             content: result.text,
@@ -98,7 +91,6 @@ export async function POST(req: Request) {
             updatedAt: new Date(),
           };
 
-          // Reload the chat to ensure we have the latest version
           const updatedChat = await Chat.findOne({ _id: chatId, userId });
           if (updatedChat) {
             updatedChat.messages.push(assistantMessage);
@@ -115,7 +107,6 @@ export async function POST(req: Request) {
       },
     });
 
-    // Save the chat with the edited message
     try {
       await chat.save();
       console.log("Chat saved with edited message");
