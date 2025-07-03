@@ -69,7 +69,6 @@ export function ChatMessage({
           )}
         >
           {isEditing ? (
-            // Edit mode
             <div className="space-y-3">
               <Textarea
                 value={editContent}

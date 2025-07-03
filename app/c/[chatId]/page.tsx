@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChatItem } from "@/types/type";
 import { ChatMessage } from "@/components/chat/chat-message";
 import { FileUpload, UploadedFile } from "@/components/ui/file-upload";
+import { Upload, Paperclip } from "lucide-react";
 
 export default function ChatPage() {
   const params = useParams();
@@ -21,6 +22,8 @@ export default function ChatPage() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isLoadingChats, setIsLoadingChats] = useState(true);
   const [isEditingMessage, setIsEditingMessage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     const loadChats = async () => {
@@ -125,9 +128,11 @@ export default function ChatPage() {
         content: msg.content,
         createdAt: new Date(msg.createdAt),
       })) || [],
+    onResponse: () => {
+      setUploadedFiles([]);
+    },
     onFinish: (message) => {
       console.log("Chat finished:", message);
-      setUploadedFiles([]);
       setIsEditingMessage(false);
 
       const reloadChat = async () => {
@@ -178,9 +183,6 @@ export default function ChatPage() {
     if (!hasText && !hasFiles) {
       return; // Don't submit if neither text nor files
     }
-
-    console.log("Submitting message:", input);
-    console.log("With files:", uploadedFiles);
 
     try {
       await handleSubmit(e);
@@ -380,12 +382,52 @@ export default function ChatPage() {
     }
   };
 
-  const handleFileUpload = (file: UploadedFile) => {
+  const handleFileUpload = async (file: UploadedFile) => {
     setUploadedFiles((prev) => [...prev, file]);
   };
 
   const handleFileRemove = (fileUrl: string) => {
     setUploadedFiles((prev) => prev.filter((file) => file.url !== fileUrl));
+  };
+
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch("/api/upload-file", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          handleFileUpload({
+            url: result.url,
+            name: result.fileName || file.name,
+            type: file.type.startsWith("image/") ? "image" : "document",
+            extractedContent: result.extractedContent,
+          });
+        } else {
+          console.error("Upload failed:", await response.text());
+        }
+      }
+    } catch (error) {
+      console.error("Error uploading files:", error);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   return (
@@ -401,9 +443,7 @@ export default function ChatPage() {
         isLoading={isLoadingChats}
       />
 
-      {/* Main content area with navbar */}
       <div className="flex-1 flex flex-col relative">
-        {/* Navbar only spans the main content area */}
         <Navbar />
 
         <div className="flex-1 overflow-hidden">
@@ -437,16 +477,17 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {(isLoading || isEditingMessage) && (
-                <div className="text-white/70 text-center py-4">
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="animate-spin w-4 h-4 border-2 border-white/20 border-t-white/70 rounded-full"></div>
-                    {isEditingMessage
-                      ? "Regenerating response..."
-                      : "ChatGPT is thinking..."}
+              {(isLoading || isEditingMessage) &&
+                messages[messages.length - 1]?.role !== "assistant" && (
+                  <div className="text-white/70 text-center py-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="animate-spin w-4 h-4 border-2 border-white/20 border-t-white/70 rounded-full"></div>
+                      {isEditingMessage
+                        ? "Regenerating response..."
+                        : "ChatGPT is thinking..."}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               <div ref={messagesEndRef} />
             </div>
@@ -458,52 +499,81 @@ export default function ChatPage() {
               className="w-full max-w-[800px] mx-auto px-4"
             >
               <div className="relative backdrop-blur-sm rounded-2xl border border-neutral-700/50 shadow-2xl shadow-black/20 transition-all duration-200 hover:border-neutral-600/50 focus-within:border-neutral-500/50">
-                <Textarea
-                  value={input}
-                  onChange={handleInputChange}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleFormSubmit(e);
-                    }
-                  }}
-                  placeholder="Message ChatGPT..."
-                  className="w-full bg-[#1f1f1f] border-none text-white text-lg placeholder:text-neutral-400 focus-visible:ring-0 resize-none py-4 px-4 pr-20 min-h-[56px] max-h-96 transition-all duration-300 rounded-2xl"
-                  disabled={isLoading || isEditingMessage}
-                />
-                <div className="absolute right-2 bottom-2.5 flex items-center gap-2">
-                  <FileUpload
-                    onFileUpload={handleFileUpload}
-                    onFileRemove={handleFileRemove}
-                    uploadedFiles={uploadedFiles}
+                <div className="relative flex items-end">
+                  <Textarea
+                    value={input}
+                    onChange={handleInputChange}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleFormSubmit(e);
+                      }
+                    }}
+                    placeholder="Message ChatGPT..."
+                    className="w-full bg-[#1f1f1f] border-none text-white text-lg placeholder:text-neutral-400 focus-visible:ring-0 resize-none py-4 px-4 pr-24 min-h-[56px] max-h-96 transition-all duration-300 rounded-2xl"
                     disabled={isLoading || isEditingMessage}
                   />
-                  <button
-                    type="submit"
-                    disabled={
-                      isLoading ||
-                      isEditingMessage ||
-                      (!input.trim() && uploadedFiles.length === 0)
-                    }
-                    className="p-1 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <svg
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      className="text-neutral-400 hover:text-white transition-colors"
+                  <div className="absolute right-2 bottom-3 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isLoading || isEditingMessage}
+                      className="p-1.5 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Upload files (Images, PDF, DOCX, TXT)"
                     >
-                      <path
-                        d="M7 11L12 6L17 11M12 18V7"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
+                      {isUploading ? (
+                        <Upload className="h-5 w-5 animate-spin text-neutral-400" />
+                      ) : (
+                        <Paperclip className="h-5 w-5 text-neutral-400 hover:text-white transition-colors" />
+                      )}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={
+                        isLoading ||
+                        isEditingMessage ||
+                        (!input.trim() && uploadedFiles.length === 0)
+                      }
+                      className="p-1.5 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        className="text-neutral-400 hover:text-white transition-colors"
+                      >
+                        <path
+                          d="M7 11L12 6L17 11M12 18V7"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  multiple
+                />
+
+                {uploadedFiles.length > 0 && (
+                  <div className="px-4 pb-3 pt-2">
+                    <FileUpload
+                      onFileUpload={handleFileUpload}
+                      onFileRemove={handleFileRemove}
+                      uploadedFiles={uploadedFiles}
+                      disabled={isLoading || isEditingMessage}
+                      hideButton
+                    />
+                  </div>
+                )}
               </div>
             </form>
           </div>

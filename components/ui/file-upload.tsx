@@ -2,7 +2,14 @@
 
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { X, Upload, FileText, Paperclip } from "lucide-react";
+import {
+  X,
+  Upload,
+  FileText,
+  Paperclip,
+  AlertCircle,
+  Maximize2,
+} from "lucide-react";
 import Image from "next/image";
 
 export interface UploadedFile {
@@ -17,6 +24,7 @@ interface FileUploadProps {
   onFileRemove: (fileUrl: string) => void;
   uploadedFiles: UploadedFile[];
   disabled?: boolean;
+  hideButton?: boolean;
 }
 
 const SUPPORTED_FILE_TYPES = {
@@ -35,13 +43,18 @@ const ALL_SUPPORTED_TYPES = [
   ...SUPPORTED_FILE_TYPES.documents,
 ];
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
 export function FileUpload({
   onFileUpload,
   onFileRemove,
   uploadedFiles,
   disabled = false,
+  hideButton = false,
 }: FileUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (
@@ -50,55 +63,33 @@ export function FileUpload({
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    console.log("=== File Upload Debug ===");
-    console.log("Files selected:", files.length);
-
     setIsUploading(true);
+    setError(null);
 
     try {
       for (const file of Array.from(files)) {
-        console.log("Processing file:", {
-          name: file.name,
-          type: file.type,
-          size: file.size,
-        });
-
-        // Validate file type
         if (!ALL_SUPPORTED_TYPES.includes(file.type)) {
-          console.error("Unsupported file type:", file.type);
-          console.log("Supported types:", ALL_SUPPORTED_TYPES);
-          alert(
-            `Unsupported file type: ${file.type}. Please select images (PNG, JPG, GIF, WebP) or documents (PDF, DOCX, TXT, MD)`
+          setError(
+            "Please select images (PNG, JPG, GIF, WebP) or documents (PDF, DOCX, TXT, MD)"
           );
           continue;
         }
 
-        // Validate file size (max 10MB)
-        if (file.size > 10 * 1024 * 1024) {
-          console.error("File too large:", file.size);
-          alert("File size must be less than 10MB");
+        if (file.size > MAX_FILE_SIZE) {
+          setError("File size must be less than 10MB");
           continue;
         }
 
-        console.log("File validation passed, uploading...");
         const formData = new FormData();
         formData.append("file", file);
 
-        console.log("Making request to /api/upload-file");
         const response = await fetch("/api/upload-file", {
           method: "POST",
           body: formData,
         });
 
-        console.log("Upload response:", {
-          ok: response.ok,
-          status: response.status,
-          statusText: response.statusText,
-        });
-
         if (response.ok) {
           const result = await response.json();
-          console.log("Upload successful:", result);
           onFileUpload({
             url: result.url,
             name: result.fileName || file.name,
@@ -107,22 +98,18 @@ export function FileUpload({
               : "document",
             extractedContent: result.extractedContent,
           });
+          setError(null);
         } else {
           const errorText = await response.text();
-          console.error("Upload failed:", {
-            status: response.status,
-            statusText: response.statusText,
-            body: errorText,
-          });
-          alert("Upload failed. Please try again.");
+          setError("Failed to upload file. Please try again.");
+          console.error("Upload failed:", errorText);
         }
       }
     } catch (error) {
       console.error("Error uploading files:", error);
-      alert("Error uploading files. Please try again.");
+      setError("Error uploading files. Please try again.");
     } finally {
       setIsUploading(false);
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -133,77 +120,112 @@ export function FileUpload({
     fileInputRef.current?.click();
   };
 
+  const handleImageClick = (url: string) => {
+    setPreviewImage(url);
+  };
+
   const renderFilePreview = (file: UploadedFile, index: number) => {
+    const handleRemove = () => {
+      onFileRemove(file.url);
+      setError(null);
+      if (previewImage === file.url) {
+        setPreviewImage(null);
+      }
+    };
+
     if (file.type === "image") {
-      return (
-        <div key={index} className="relative group">
-          <Image
-            src={file.url}
-            alt={`Uploaded image ${index + 1}`}
-            width={80}
-            height={80}
-            className="rounded-lg object-cover"
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => onFileRemove(file.url)}
-            className="absolute -top-2 -right-2 h-6 w-6 p-0 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        </div>
-      );
-    } else {
       return (
         <div
           key={index}
-          className="relative group flex items-center gap-2 p-2 bg-neutral-700/50 rounded-lg border border-neutral-600"
+          className="group relative rounded-lg overflow-hidden border border-neutral-700/50 cursor-pointer"
+          onClick={() => handleImageClick(file.url)}
         >
-          <FileText className="h-6 w-6 text-neutral-400 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-white truncate">{file.name}</p>
-            {file.extractedContent && (
-              <p className="text-xs text-neutral-400 truncate">
-                {file.extractedContent.slice(0, 50)}...
-              </p>
-            )}
+          <div className="relative w-[60px] h-[60px]">
+            <Image
+              src={file.url}
+              alt={file.name}
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Maximize2 className="w-3 h-3 text-white" />
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRemove();
+              }}
+              className="absolute top-0.5 right-0.5 h-5 w-5 p-0 bg-black/40 hover:bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <X className="h-2.5 w-2.5" />
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => onFileRemove(file.url)}
-            className="h-6 w-6 p-0 text-neutral-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            <X className="h-3 w-3" />
-          </Button>
+          <div className="p-1 bg-neutral-800/80 backdrop-blur-sm">
+            <p className="text-[10px] text-neutral-300 truncate">{file.name}</p>
+          </div>
         </div>
       );
     }
+
+    return (
+      <div
+        key={index}
+        className="group relative flex items-center gap-2 p-2 bg-neutral-800/50 rounded-lg border border-neutral-700/50 hover:border-neutral-600/50 transition-colors"
+      >
+        <FileText className="h-5 w-5 text-neutral-400 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-white font-medium truncate">{file.name}</p>
+          {file.extractedContent && (
+            <p className="text-[10px] text-neutral-400 truncate">
+              {file.extractedContent.slice(0, 100)}...
+            </p>
+          )}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleRemove}
+          className="h-6 w-6 p-0 text-neutral-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+    );
   };
 
   return (
     <div className="space-y-2">
-      {/* Upload Button */}
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={triggerFileSelect}
-        disabled={disabled || isUploading}
-        className="h-8 w-8 p-0 hover:bg-neutral-700/50"
-        title="Upload files (Images, PDF, DOCX, TXT)"
-      >
-        {isUploading ? (
-          <Upload className="h-4 w-4 animate-spin" />
-        ) : (
-          <Paperclip className="h-4 w-4" />
-        )}
-      </Button>
+      {!hideButton && (
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={triggerFileSelect}
+            disabled={disabled || isUploading}
+            className="h-8 w-8 p-0 hover:bg-neutral-700/50 transition-colors"
+            title="Upload files (Images, PDF, DOCX, TXT)"
+          >
+            {isUploading ? (
+              <Upload className="h-4 w-4 animate-spin" />
+            ) : (
+              <Paperclip className="h-4 w-4" />
+            )}
+          </Button>
 
-      {/* Hidden File Input */}
+          {error && (
+            <div className="flex items-center gap-1.5 text-red-400 text-sm">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       <input
         ref={fileInputRef}
         type="file"
@@ -213,10 +235,36 @@ export function FileUpload({
         className="hidden"
       />
 
-      {/* Uploaded Files Preview */}
       {uploadedFiles.length > 0 && (
-        <div className="flex flex-wrap gap-2 p-2 bg-neutral-800/50 rounded-lg">
+        <div className="flex flex-wrap gap-2">
           {uploadedFiles.map((file, index) => renderFilePreview(file, index))}
+        </div>
+      )}
+
+      {previewImage && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="relative max-w-4xl w-full max-h-[90vh] rounded-lg overflow-hidden">
+            <Image
+              src={previewImage}
+              alt="Preview"
+              width={1200}
+              height={800}
+              className="w-full h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-2 right-2 h-8 w-8 p-0 bg-black/40 hover:bg-black/60 text-white rounded-full"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
     </div>
