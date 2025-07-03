@@ -13,6 +13,8 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUser, useClerk } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 
 interface NavbarProps {
   onNewChat?: () => void;
@@ -20,9 +22,18 @@ interface NavbarProps {
 }
 
 export function Navbar({ onNewChat, className }: NavbarProps) {
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const router = useRouter();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+
+  const handleSignOut = () => {
+    signOut().then(() => {
+      router.push("/sign-in");
+    });
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -46,6 +57,18 @@ export function Navbar({ onNewChat, className }: NavbarProps) {
     onNewChat?.();
   };
 
+  // Get user initials for avatar
+  const getInitials = () => {
+    if (!user?.firstName && !user?.lastName) {
+      return (
+        user?.emailAddresses[0]?.emailAddress?.charAt(0).toUpperCase() || "U"
+      );
+    }
+    return `${(user?.firstName?.[0] || "").toUpperCase()}${(
+      user?.lastName?.[0] || ""
+    ).toUpperCase()}`;
+  };
+
   return (
     <nav
       className={cn(
@@ -54,7 +77,6 @@ export function Navbar({ onNewChat, className }: NavbarProps) {
       )}
     >
       <div className="flex h-14 items-center justify-between px-4">
-        {/* Left Section - Hamburger Menu */}
         <div className="flex items-center" data-model-menu>
           <Button
             onClick={() => setIsModelMenuOpen(!isModelMenuOpen)}
@@ -147,8 +169,6 @@ export function Navbar({ onNewChat, className }: NavbarProps) {
           </Button>
         </div>
 
-        {/* Center Section - ChatGPT Brand with Model Selector */}
-
         {/* Right Section - Share, More Menu, and User Profile */}
         <div className="flex items-center gap-2">
           {/* Share Button */}
@@ -204,7 +224,7 @@ export function Navbar({ onNewChat, className }: NavbarProps) {
               className="h-8 w-8 p-0 rounded-full hover:bg-neutral-800/50"
             >
               <div className="h-6 w-6 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-medium">
-                P
+                {getInitials()}
               </div>
             </Button>
 
@@ -215,11 +235,12 @@ export function Navbar({ onNewChat, className }: NavbarProps) {
                 <div className="px-4 py-3 border-b border-neutral-700/50">
                   <div className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-medium">
-                      P
+                      {getInitials()}
                     </div>
                     <div>
                       <div className="text-white text-sm font-medium">
-                        Pawan Pandey
+                        {user?.fullName ||
+                          user?.emailAddresses[0]?.emailAddress}
                       </div>
                       <div className="text-neutral-400 text-xs">Free plan</div>
                     </div>
@@ -245,9 +266,12 @@ export function Navbar({ onNewChat, className }: NavbarProps) {
 
                   <div className="border-t border-neutral-700/50 my-1"></div>
 
-                  <button className="w-full px-4 py-2 text-left text-white hover:bg-neutral-700/50 flex items-center gap-3 text-sm">
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full px-4 py-2 text-left text-white hover:bg-neutral-700/50 flex items-center gap-3 text-sm"
+                  >
                     <LogOut className="h-4 w-4" />
-                    Log out
+                    Sign out
                   </button>
                 </div>
               </div>
