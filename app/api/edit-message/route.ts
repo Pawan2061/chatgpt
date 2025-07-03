@@ -2,13 +2,25 @@ import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { Chat, IMessage } from "@/lib/models/chat";
 import connectDB from "@/lib/db";
+import { currentUser } from "@clerk/nextjs/server";
 
 export async function POST(req: Request) {
   try {
     const { chatId, messageIndex, newContent } = await req.json();
 
-    // Get authenticated user
-    const userId = "test-user";
+    const user = await currentUser();
+
+    if (!user?.id) {
+      return new Response(
+        JSON.stringify({
+          error: "Unauthorized",
+          details: "User not authenticated",
+        }),
+        { status: 401 }
+      );
+    }
+
+    const userId = user.id;
     console.log("=== Edit Message API Request ===");
     console.log("ChatId:", chatId);
     console.log("Message Index:", messageIndex);

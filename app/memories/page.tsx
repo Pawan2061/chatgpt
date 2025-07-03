@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { searchMemories } from "@/lib/mem0";
 import {
   Search,
   Clock,
@@ -9,12 +8,14 @@ import {
   Hash,
   FileText,
   Image,
+  Loader2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useUser } from "@clerk/nextjs";
 
 interface Memory {
   id: string;
@@ -32,30 +33,45 @@ interface Memory {
 }
 
 export default function MemoriesPage() {
+  const { user } = useUser();
   const [memories, setMemories] = useState<Memory[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [searchMode, setSearchMode] = useState<"all" | "search">("all");
-
-  const userId = "test-user";
+  const [error, setError] = useState<string | null>(null);
 
   const loadAllMemories = async () => {
+    if (!user?.id) {
+      setError("Please sign in to view memories");
+      return;
+    }
+
     setLoading(true);
+    setError(null);
     try {
-      const results = await searchMemories("", {
-        userId,
-        limit: 50,
-        threshold: 0.1,
-      });
+      const response = await fetch(`/api/memories`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch memories");
+      }
+      const results = await response.json();
       setMemories(results);
+      if (results.length === 0) {
+        setError("No memories found. Start chatting to create memories!");
+      }
     } catch (error) {
       console.error("Error loading memories:", error);
+      setError("Failed to load memories. Please try again later.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleSearch = async () => {
+    if (!user?.id) {
+      setError("Please sign in to search memories");
+      return;
+    }
+
     if (!searchQuery.trim()) {
       setSearchMode("all");
       loadAllMemories();
@@ -64,23 +80,32 @@ export default function MemoriesPage() {
 
     setLoading(true);
     setSearchMode("search");
+    setError(null);
     try {
-      const results = await searchMemories(searchQuery, {
-        userId,
-        limit: 20,
-        threshold: 0.5,
-      });
+      const response = await fetch(
+        `/api/memories?query=${encodeURIComponent(searchQuery)}`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to search memories");
+      }
+      const results = await response.json();
       setMemories(results);
+      if (results.length === 0) {
+        setError("No memories found for your search. Try a different query.");
+      }
     } catch (error) {
       console.error("Error searching memories:", error);
+      setError("Failed to search memories. Please try again later.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadAllMemories();
-  }, []);
+    if (user?.id) {
+      loadAllMemories();
+    }
+  }, [user?.id]);
 
   const formatDate = (timestamp?: string) => {
     if (!timestamp) return "Unknown time";
@@ -91,6 +116,24 @@ export default function MemoriesPage() {
     if (text.length <= maxLength) return text;
     return text.slice(0, maxLength) + "...";
   };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md mx-4">
+          <CardContent className="pt-6 text-center">
+            <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">
+              Sign in to view memories
+            </h3>
+            <p className="text-muted-foreground">
+              Your chat memories will appear here after you sign in.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -123,7 +166,14 @@ export default function MemoriesPage() {
               disabled={loading}
               className="shrink-0"
             >
-              {loading ? "Searching..." : "Search"}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Searching...
+                </>
+              ) : (
+                "Search"
+              )}
             </Button>
           </div>
         </div>
@@ -156,12 +206,21 @@ export default function MemoriesPage() {
 
         {loading && (
           <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
             <p className="text-muted-foreground mt-2">Loading memories...</p>
           </div>
         )}
 
-        {!loading && (
+        {!loading && error && (
+          <Card className="text-center py-12">
+            <CardContent className="pt-6">
+              <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">{error}</h3>
+            </CardContent>
+          </Card>
+        )}
+
+        {!loading && !error && (
           <div className="space-y-4">
             {memories.length === 0 ? (
               <Card className="text-center py-12">

@@ -1,7 +1,11 @@
 import { MemoryClient } from "mem0ai";
 
+if (!process.env.NEXT_PUBLIC_MEM0_API_KEY) {
+  throw new Error("NEXT_PUBLIC_MEM0_API_KEY is not defined");
+}
+
 const mem0Client = new MemoryClient({
-  apiKey: process.env.NEXT_PUBLIC_MEM0_API_KEY || "",
+  apiKey: process.env.NEXT_PUBLIC_MEM0_API_KEY,
 });
 
 export interface MemorySearchResult {
@@ -97,6 +101,8 @@ export async function searchMemories(
       user_id: userId,
       limit,
     })) as MemoryApiResponse[];
+
+    console.log(response, "response is here");
 
     const filteredResults: MemorySearchResult[] = response
       .filter((result: MemoryApiResponse) => result.score >= threshold)

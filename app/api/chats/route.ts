@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Chat, IMessage } from "@/lib/models/chat";
 import connectDB from "@/lib/db";
 import { Types } from "mongoose";
+import { currentUser } from "@clerk/nextjs/server";
 
 interface ChatObject {
   _id: Types.ObjectId;
@@ -14,14 +15,16 @@ interface ChatObject {
 
 export async function GET() {
   try {
-    const userId = "test-user";
+    const user = await currentUser();
 
-    if (!userId) {
+    if (!user?.id) {
       return NextResponse.json(
         { error: "Unauthorized", details: "User not authenticated" },
         { status: 401 }
       );
     }
+
+    const userId = user.id;
 
     await connectDB();
 

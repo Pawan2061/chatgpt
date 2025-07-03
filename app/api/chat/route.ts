@@ -4,12 +4,25 @@ import { Chat, IMessage } from "@/lib/models/chat";
 import connectDB from "@/lib/db";
 import mongoose from "mongoose";
 import { addMemory, searchMemories } from "@/lib/mem0";
+import { currentUser } from "@clerk/nextjs/server";
 
 export async function POST(req: Request) {
   try {
+    const user = await currentUser();
+
+    if (!user?.id) {
+      return new Response(
+        JSON.stringify({
+          error: "Unauthorized",
+          details: "User not authenticated",
+        }),
+        { status: 401 }
+      );
+    }
+
+    const userId = user.id;
     const { messages, chatId, files } = await req.json();
 
-    const userId = "test-user";
     console.log("=== Chat API Request ===");
     console.log("ChatId:", chatId);
     console.log("Messages received:", messages?.length || 0);
