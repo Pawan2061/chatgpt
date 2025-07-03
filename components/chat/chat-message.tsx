@@ -6,9 +6,10 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Edit, Check, X } from "lucide-react";
+import { UploadedFile } from "@/components/ui/file-upload";
 
 interface ChatMessageProps {
-  message: Message;
+  message: Message & { files?: UploadedFile[] };
   messageIndex?: number;
   onEditMessage?: (messageIndex: number, newContent: string) => void;
 }
@@ -21,6 +22,7 @@ export function ChatMessage({
   const isUser = message.role === "user";
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
+  console.log("message", message);
 
   const handleEditStart = () => {
     setIsEditing(true);
@@ -97,20 +99,96 @@ export function ChatMessage({
               </div>
             </div>
           ) : (
-            // Normal display mode
             <>
               <div className="prose prose-invert max-w-none font-[16px] text-white">
                 <ReactMarkdown>{message.content}</ReactMarkdown>
               </div>
 
-              {/* Action buttons */}
+              {message.files && message.files.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {message.files.map((file, index) => {
+                    // Determine if the file is an image based on URL or type
+                    const isImage =
+                      file.type === "image" ||
+                      /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(file.url);
+                    const isDocument =
+                      file.type === "document" ||
+                      /\.(pdf|doc|docx|txt|md)$/i.test(file.url);
+
+                    return (
+                      <div
+                        key={index}
+                        className={cn(
+                          "flex items-center gap-2",
+                          isUser ? "justify-end" : "justify-start"
+                        )}
+                      >
+                        {isImage ? (
+                          <img
+                            src={file.url}
+                            alt={file.name || "Uploaded image"}
+                            className="max-w-[300px] rounded-lg border border-neutral-700"
+                          />
+                        ) : isDocument ? (
+                          <a
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-blue-400 hover:text-blue-300 bg-neutral-800/50 px-3 py-2 rounded-lg transition-colors"
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                              <polyline points="14 2 14 8 20 8" />
+                            </svg>
+                            {file.name ||
+                              file.url.split("/").pop() ||
+                              "Download file"}
+                          </a>
+                        ) : (
+                          <a
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-blue-400 hover:text-blue-300"
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                              <polyline points="7 10 12 15 17 10" />
+                              <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
+                            {file.name || "Download file"}
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               <div
                 className={cn(
                   "flex items-center gap-2",
                   isUser ? "justify-end" : "justify-start"
                 )}
               >
-                {/* Edit button for user messages */}
                 {isUser && onEditMessage && messageIndex !== undefined && (
                   <button
                     onClick={handleEditStart}
@@ -121,10 +199,8 @@ export function ChatMessage({
                   </button>
                 )}
 
-                {/* Assistant message actions */}
                 {!isUser && (
                   <>
-                    {/* Copy button */}
                     <button className="p-1.5 hover:bg-neutral-800 rounded-lg transition-colors">
                       <svg
                         width="20"
@@ -143,7 +219,6 @@ export function ChatMessage({
                       </svg>
                     </button>
 
-                    {/* Thumbs up */}
                     <button className="p-1.5 hover:bg-neutral-800 rounded-lg transition-colors">
                       <svg
                         width="20"
@@ -162,7 +237,6 @@ export function ChatMessage({
                       </svg>
                     </button>
 
-                    {/* Thumbs down */}
                     <button className="p-1.5 hover:bg-neutral-800 rounded-lg transition-colors">
                       <svg
                         width="20"
@@ -181,7 +255,6 @@ export function ChatMessage({
                       </svg>
                     </button>
 
-                    {/* More options */}
                     <button className="p-1.5 hover:bg-neutral-800 rounded-lg transition-colors">
                       <svg
                         width="20"
@@ -200,7 +273,6 @@ export function ChatMessage({
                       </svg>
                     </button>
 
-                    {/* Share */}
                     <button className="p-1.5 hover:bg-neutral-800 rounded-lg transition-colors">
                       <svg
                         width="20"

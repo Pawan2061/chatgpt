@@ -11,6 +11,18 @@ import { ChatMessage } from "@/components/chat/chat-message";
 import { FileUpload, UploadedFile } from "@/components/ui/file-upload";
 import { Upload, Paperclip } from "lucide-react";
 
+interface MessageWithFiles extends Message {
+  files?: UploadedFile[];
+}
+
+interface ChatMessageWithFiles {
+  id: string;
+  content: string;
+  role: "user" | "assistant";
+  createdAt: string | Date;
+  files?: string[];
+}
+
 export default function ChatPage() {
   const params = useParams();
   const router = useRouter();
@@ -122,12 +134,30 @@ export default function ChatPage() {
       files: uploadedFiles,
     },
     initialMessages:
-      currentChat?.messages?.map((msg, index) => ({
-        id: msg.id || `msg-${index}`,
-        role: msg.role as "user" | "assistant",
-        content: msg.content,
-        createdAt: new Date(msg.createdAt),
-      })) || [],
+      currentChat?.messages?.map((msg: ChatMessageWithFiles, index) => {
+        // Convert file URLs to file objects with proper type information
+        const files = msg.files?.map((url: string) => {
+          const fileName = url.split("/").pop() || "file";
+          // Check if the URL points to an image based on common image extensions
+          const isImage = /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(url);
+          // Check if the URL points to a document based on common document extensions
+          const isDocument = /\.(pdf|doc|docx|txt|md)$/i.test(url);
+          return {
+            url,
+            name: fileName,
+            type: isImage ? "image" : isDocument ? "document" : "file",
+            extractedContent: undefined,
+          };
+        });
+
+        return {
+          id: msg.id || `msg-${index}`,
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+          createdAt: new Date(msg.createdAt),
+          files: files,
+        };
+      }) || [],
     onResponse: () => {
       setUploadedFiles([]);
     },
@@ -460,14 +490,47 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {messages.map((message: Message, index: number) => (
-                <ChatMessage
-                  key={message.id || index}
-                  message={message}
-                  messageIndex={index}
-                  onEditMessage={handleEditMessage}
-                />
-              ))}
+              {messages.map((message: Message, index: number) => {
+                const isLastUserMessage =
+                  index === messages.length - 2 && message.role === "user";
+                let files = isLastUserMessage
+                  ? uploadedFiles
+                  : (message as MessageWithFiles).files;
+
+                // If the message has files in the URL format, convert them to the proper format
+                if (
+                  Array.isArray(files) &&
+                  files.length > 0 &&
+                  typeof files[0] === "string"
+                ) {
+                  files = (files as string[]).map((url) => {
+                    const fileName = url.split("/").pop() || "file";
+                    const isImage = /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(
+                      url
+                    );
+                    const isDocument = /\.(pdf|doc|docx|txt|md)$/i.test(url);
+                    return {
+                      url,
+                      name: fileName,
+                      type: isImage
+                        ? "image"
+                        : isDocument
+                        ? "document"
+                        : "file",
+                      extractedContent: undefined,
+                    };
+                  });
+                }
+
+                return (
+                  <ChatMessage
+                    key={message.id || index}
+                    message={{ ...message, files }}
+                    messageIndex={index}
+                    onEditMessage={handleEditMessage}
+                  />
+                );
+              })}
 
               {error && (
                 <div className="text-red-500 text-center py-4 px-4">
