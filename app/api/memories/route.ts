@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import mem0Client from "@/lib/mem0";
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const user = await currentUser();
 

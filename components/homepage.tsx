@@ -2,12 +2,12 @@
 
 import { ChatSidebar } from "@/components/sidebar/sidebar";
 import { Navbar } from "@/components/layout/navbar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChatItem } from "@/types/type";
 import { Textarea } from "@/components/ui/textarea";
 import { useRouter } from "next/navigation";
 import { FileUpload, UploadedFile } from "@/components/ui/file-upload";
-import { Upload } from "lucide-react";
+import { Upload, Paperclip } from "lucide-react";
 
 export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -18,6 +18,8 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isLoadingChats, setIsLoadingChats] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -116,12 +118,52 @@ export default function Home() {
     router.push(`/c/${newChatId}?${params.toString()}`);
   };
 
-  const handleFileUpload = (file: UploadedFile) => {
+  const handleFileUpload = async (file: UploadedFile) => {
     setUploadedFiles((prev) => [...prev, file]);
   };
 
   const handleFileRemove = (fileUrl: string) => {
     setUploadedFiles((prev) => prev.filter((file) => file.url !== fileUrl));
+  };
+
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch("/api/upload-file", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          handleFileUpload({
+            url: result.url,
+            name: result.fileName || file.name,
+            type: file.type.startsWith("image/") ? "image" : "document",
+            extractedContent: result.extractedContent,
+          });
+        } else {
+          console.error("Upload failed:", await response.text());
+        }
+      }
+    } catch (error) {
+      console.error("Error uploading files:", error);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   return (
@@ -138,19 +180,29 @@ export default function Home() {
       />
 
       <div className="flex-1 flex flex-col relative">
-        <Navbar onNewChat={handleNewChat} />
+        <Navbar />
 
-        <main className="flex-1 overflow-hidden relative">
-          <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
-            <div className="text-center mb-8">
-              <h1 className="text-[2rem] sm:text-[2.5rem] font-medium text-white mb-2 leading-tight">
-                What&apos;s on the agenda today?
-              </h1>
+        <div className="flex-1 overflow-hidden">
+          <div className="h-full overflow-y-auto">
+            <div className="pb-[120px] max-w-[800px] mx-auto">
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center text-neutral-400">
+                  <h2 className="text-2xl font-semibold mb-2">
+                    Start a conversation
+                  </h2>
+                  <p>Send a message to begin chatting with ChatGPT</p>
+                </div>
+              </div>
             </div>
+          </div>
 
-            <div className="w-full max-w-[768px]">
-              <form onSubmit={handleFormSubmit} className="relative">
-                <div className="relative bg-[#2f2f2f] backdrop-blur-sm rounded-3xl border border-neutral-600/50 shadow-2xl shadow-black/20 transition-all duration-200 hover:border-neutral-500/50 focus-within:border-neutral-400/50">
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#171717] via-[#171717] to-transparent pt-6 pb-6">
+            <form
+              onSubmit={handleFormSubmit}
+              className="w-full max-w-[800px] mx-auto px-4"
+            >
+              <div className="relative backdrop-blur-sm rounded-2xl border border-neutral-700/50 shadow-2xl shadow-black/20 transition-all duration-200 hover:border-neutral-600/50 focus-within:border-neutral-500/50">
+                <div className="relative flex items-end">
                   <Textarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
@@ -160,21 +212,28 @@ export default function Home() {
                         handleFormSubmit(e);
                       }
                     }}
-                    placeholder="Ask anything"
-                    className="w-full bg-transparent border-none text-white text-lg placeholder:text-neutral-400 focus-visible:ring-0 resize-none py-4 px-6 pr-20 min-h-[56px] max-h-96 transition-all duration-300 rounded-3xl"
+                    placeholder="Message ChatGPT..."
+                    className="w-full bg-[#1f1f1f] border-none text-white text-lg placeholder:text-neutral-400 focus-visible:ring-0 resize-none py-4 px-4 pr-24 min-h-[56px] max-h-96 transition-all duration-300 rounded-2xl"
                   />
-                  <div className="absolute right-3 bottom-3 flex items-center gap-2">
-                    <FileUpload
-                      onFileUpload={handleFileUpload}
-                      onFileRemove={handleFileRemove}
-                      uploadedFiles={uploadedFiles}
-                    />
+                  <div className="absolute right-2 bottom-3 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-1.5 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Upload files (Images, PDF, DOCX, TXT)"
+                    >
+                      {isUploading ? (
+                        <Upload className="h-5 w-5 animate-spin text-neutral-400" />
+                      ) : (
+                        <Paperclip className="h-5 w-5 text-neutral-400 hover:text-white transition-colors" />
+                      )}
+                    </button>
                     <button
                       type="submit"
                       disabled={!input.trim() && uploadedFiles.length === 0}
-                      className="p-2 hover:bg-neutral-600/50 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-1.5 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {/* <svg
+                      <svg
                         width="20"
                         height="20"
                         viewBox="0 0 24 24"
@@ -188,21 +247,33 @@ export default function Home() {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         />
-                      </svg> */}
-                      <Upload className="w-5 h-5 text-neutral-400 hover:text-white transition-colors" />
+                      </svg>
                     </button>
                   </div>
                 </div>
-              </form>
 
-              <div className="text-center mt-4">
-                <p className="text-xs text-neutral-500">
-                  ChatGPT can make mistakes. Check important info.
-                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  multiple
+                />
+
+                {uploadedFiles.length > 0 && (
+                  <div className="px-4 pb-3 pt-2">
+                    <FileUpload
+                      onFileUpload={handleFileUpload}
+                      onFileRemove={handleFileRemove}
+                      uploadedFiles={uploadedFiles}
+                      hideButton
+                    />
+                  </div>
+                )}
               </div>
-            </div>
+            </form>
           </div>
-        </main>
+        </div>
       </div>
     </div>
   );
