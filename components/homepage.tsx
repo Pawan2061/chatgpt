@@ -7,6 +7,7 @@ import { ChatItem } from "@/types/type";
 import { Textarea } from "@/components/ui/textarea";
 import { useRouter } from "next/navigation";
 import { FileUpload, UploadedFile } from "@/components/ui/file-upload";
+import { Upload } from "lucide-react";
 
 export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -62,10 +63,6 @@ export default function Home() {
     setSelectedChatId(newChatId);
     router.push(`/c/${newChatId}`);
   };
-
-  // const handleEditChat = (chatId: string) => {
-  //   console.log("Edit chat:", chatId);
-  // };
 
   const handleDeleteChat = async (chatId: string) => {
     try {
@@ -177,7 +174,7 @@ export default function Home() {
                       disabled={!input.trim() && uploadedFiles.length === 0}
                       className="p-2 hover:bg-neutral-600/50 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <svg
+                      {/* <svg
                         width="20"
                         height="20"
                         viewBox="0 0 24 24"
@@ -191,7 +188,8 @@ export default function Home() {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         />
-                      </svg>
+                      </svg> */}
+                      <Upload className="w-5 h-5 text-neutral-400 hover:text-white transition-colors" />
                     </button>
                   </div>
                 </div>

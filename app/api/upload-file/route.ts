@@ -23,8 +23,6 @@ async function extractTextFromPDF(buffer: Buffer): Promise<string> {
 
     console.log(`PDF has ${pages.length} pages`);
 
-    // For now, we'll return a basic message since pdf-lib doesn't have built-in text extraction
-    // In a production app, you might want to use a service like AWS Textract or Google Document AI
     const extractedText = `PDF document uploaded with ${pages.length} page(s). Content analysis available through vision model.`;
 
     console.log("PDF processed successfully");
@@ -71,7 +69,6 @@ export async function POST(request: NextRequest) {
       size: file.size,
     });
 
-    // Validate file type
     const allSupportedTypes = [
       ...SUPPORTED_FILE_TYPES.images,
       ...SUPPORTED_FILE_TYPES.documents,
@@ -84,7 +81,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       console.log("File too large:", file.size);
       return NextResponse.json(
@@ -124,7 +120,6 @@ export async function POST(request: NextRequest) {
 
     let extractedContent = "";
 
-    // Extract text content for documents
     if (SUPPORTED_FILE_TYPES.documents.includes(file.type)) {
       console.log("Processing document for text extraction...");
       try {
@@ -152,7 +147,6 @@ export async function POST(request: NextRequest) {
         }
       } catch (textError) {
         console.error("Text extraction error:", textError);
-        // Don't fail the upload if text extraction fails
         extractedContent = "";
       }
     }

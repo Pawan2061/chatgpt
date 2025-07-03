@@ -36,6 +36,7 @@ export default function ChatPage() {
   const [isEditingMessage, setIsEditingMessage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const loadChats = async () => {
@@ -126,6 +127,7 @@ export default function ChatPage() {
     isLoading,
     error,
     setMessages,
+    reload,
   } = useChat({
     api: "/api/chat",
     id: params.chatId as string,
@@ -135,12 +137,9 @@ export default function ChatPage() {
     },
     initialMessages:
       currentChat?.messages?.map((msg: ChatMessageWithFiles, index) => {
-        // Convert file URLs to file objects with proper type information
         const files = msg.files?.map((url: string) => {
           const fileName = url.split("/").pop() || "file";
-          // Check if the URL points to an image based on common image extensions
           const isImage = /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(url);
-          // Check if the URL points to a document based on common document extensions
           const isDocument = /\.(pdf|doc|docx|txt|md)$/i.test(url);
           return {
             url,
@@ -182,7 +181,6 @@ export default function ChatPage() {
 
       reloadChat();
 
-      // Also reload all chats to update the sidebar
       const reloadAllChats = async () => {
         try {
           const response = await fetch("/api/chats");
@@ -195,7 +193,7 @@ export default function ChatPage() {
         }
       };
 
-      setTimeout(reloadAllChats, 1000); // Delay to ensure the chat is saved
+      setTimeout(reloadAllChats, 1000);
     },
     onError: (error) => {
       console.error("Chat error:", error);
@@ -206,12 +204,11 @@ export default function ChatPage() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Allow submission if there's text input OR uploaded files
     const hasText = input.trim().length > 0;
     const hasFiles = uploadedFiles.length > 0;
 
     if (!hasText && !hasFiles) {
-      return; // Don't submit if neither text nor files
+      return;
     }
 
     try {
@@ -221,7 +218,7 @@ export default function ChatPage() {
     }
   };
 
-  // Handle message editing
+  // Simplified message editing using useChat
   const handleEditMessage = async (
     messageIndex: number,
     newContent: string
@@ -230,6 +227,7 @@ export default function ChatPage() {
 
     try {
       setIsEditingMessage(true);
+
       console.log(
         "Editing message at index:",
         messageIndex,
@@ -237,7 +235,7 @@ export default function ChatPage() {
         newContent
       );
 
-      // Update the message in the local state immediately
+      // Update the message content in the local state
       const updatedMessages = [...messages];
       updatedMessages[messageIndex] = {
         ...updatedMessages[messageIndex],
@@ -246,127 +244,33 @@ export default function ChatPage() {
 
       // Remove messages after the edited one
       const messagesUpToEdit = updatedMessages.slice(0, messageIndex + 1);
+
+      // Update the messages state
       setMessages(messagesUpToEdit);
 
-      const response = await fetch("/api/edit-message", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      // Use reload to regenerate the response with the updated messages
+      await reload({
+        body: {
           chatId: params.chatId,
-          messageIndex,
-          newContent,
-        }),
+          files: uploadedFiles,
+          isEdit: true,
+          messages: messagesUpToEdit,
+        },
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to edit message: ${response.status}`);
-      }
-
-      const reader = response.body?.getReader();
-      if (reader) {
-        let assistantMessage = "";
-        const assistantMessageObj: Message = {
-          id: `edit-response-${Date.now()}`,
-          role: "assistant",
-          content: "",
-          createdAt: new Date(),
-        };
-
-        setMessages((prev) => [...prev, assistantMessageObj]);
-
-        try {
-          const decoder = new TextDecoder();
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              console.log("Streaming completed");
-              setIsEditingMessage(false);
-              break;
-            }
-
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split("\n").filter((line) => line.trim());
-
-            for (const line of lines) {
-              if (line.startsWith("0:")) {
-                try {
-                  const jsonStr = line.slice(2);
-                  const data = JSON.parse(jsonStr);
-
-                  if (data.type === "text-delta" && data.textDelta) {
-                    assistantMessage += data.textDelta;
-                    setMessages((prev) => {
-                      const updated = [...prev];
-                      const lastIndex = updated.length - 1;
-                      if (lastIndex >= 0) {
-                        updated[lastIndex] = {
-                          ...updated[lastIndex],
-                          content: assistantMessage,
-                        };
-                      }
-                      return updated;
-                    });
-                  } else if (data.type === "finish") {
-                    console.log("Stream finished");
-                    setIsEditingMessage(false);
-                  }
-                } catch (parseError) {
-                  console.log("Parse error for line:", line, parseError);
-                }
-              }
-            }
-          }
-        } finally {
-          reader.releaseLock();
-          setIsEditingMessage(false);
-        }
-      } else {
-        setIsEditingMessage(false);
-      }
-
-      setTimeout(async () => {
-        try {
-          const chatResponse = await fetch(`/api/chats/${params.chatId}`);
-          if (chatResponse.ok) {
-            const chatData = await chatResponse.json();
-            setAvailableChats((prev) => ({
-              ...prev,
-              [params.chatId as string]: chatData,
-            }));
-
-            const freshMessages =
-              chatData.messages?.map(
-                (
-                  msg: {
-                    id?: string;
-                    role: string;
-                    content: string;
-                    createdAt: string;
-                  },
-                  index: number
-                ) => ({
-                  id: msg.id || `msg-${index}`,
-                  role: msg.role as "user" | "assistant",
-                  content: msg.content,
-                  createdAt: new Date(msg.createdAt),
-                })
-              ) || [];
-
-            setMessages(freshMessages);
-            console.log("Chat reloaded with", freshMessages.length, "messages");
-          }
-        } catch (error) {
-          console.error("Error reloading chat after edit:", error);
-        }
-      }, 2000);
     } catch (error) {
       console.error("Error editing message:", error);
       setIsEditingMessage(false);
     }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -385,10 +289,6 @@ export default function ChatPage() {
     setUploadedFiles([]);
     router.push(`/c/${newChatId}`);
   };
-
-  // const handleEditChat = (chatId: string) => {
-  //   console.log("Edit chat:", chatId);
-  // };
 
   const handleDeleteChat = async (chatId: string) => {
     try {
@@ -503,20 +403,16 @@ export default function ChatPage() {
                   files.length > 0 &&
                   typeof files[0] === "string"
                 ) {
-                  files = (files as string[]).map((url) => {
+                  const stringFiles = files as unknown as string[];
+                  files = stringFiles.map((url) => {
                     const fileName = url.split("/").pop() || "file";
                     const isImage = /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(
                       url
                     );
-                    const isDocument = /\.(pdf|doc|docx|txt|md)$/i.test(url);
                     return {
                       url,
                       name: fileName,
-                      type: isImage
-                        ? "image"
-                        : isDocument
-                        ? "document"
-                        : "file",
+                      type: isImage ? "image" : "document",
                       extractedContent: undefined,
                     };
                   });

@@ -22,7 +22,6 @@ export function ChatMessage({
   const isUser = message.role === "user";
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
-  console.log("message", message);
 
   const handleEditStart = () => {
     setIsEditing(true);

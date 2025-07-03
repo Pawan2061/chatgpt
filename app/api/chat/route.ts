@@ -21,13 +21,14 @@ export async function POST(req: Request) {
     }
 
     const userId = user.id;
-    const { messages, chatId, files } = await req.json();
+    const { messages, chatId, files, isEdit } = await req.json();
 
     console.log("=== Chat API Request ===");
     console.log("ChatId:", chatId);
     console.log("Messages received:", messages?.length || 0);
     console.log("Files:", files?.length || 0);
     console.log("User ID:", userId);
+    console.log("Is Edit:", isEdit);
 
     await connectDB();
 
@@ -130,7 +131,9 @@ export async function POST(req: Request) {
       updatedAt: new Date(),
     };
 
-    chat.messages.push(userMessage);
+    if (!isEdit) {
+      chat.messages.push(userMessage);
+    }
 
     if (chat.title === "New Chat" && messageContent.trim()) {
       chat.title =
@@ -212,14 +215,16 @@ export async function POST(req: Request) {
       content: systemContent,
     });
 
-    const recentMessages = chat.messages.slice(-10);
-    for (const msg of recentMessages) {
+    // Use frontend messages for editing, database messages for normal chat
+    const messagesToUse = isEdit ? messages : chat.messages.slice(-10);
+
+    for (const msg of messagesToUse) {
       if (msg.role === "user") {
         if (
           msg.files &&
           msg.files.length > 0 &&
           hasImages &&
-          msg === chat.messages[chat.messages.length - 1]
+          msg === messagesToUse[messagesToUse.length - 1]
         ) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const parts: any[] = [];
@@ -276,6 +281,25 @@ export async function POST(req: Request) {
 
           const updatedChat = await Chat.findOne({ _id: actualChatId, userId });
           if (updatedChat) {
+            // For edits, we need to update the database with the current frontend state
+            if (isEdit && messages && messages.length > 0) {
+              // Replace the chat messages with the frontend messages + new assistant message
+              updatedChat.messages = messages.map(
+                (msg: {
+                  role: string;
+                  content: string;
+                  files?: string[];
+                  createdAt?: Date;
+                }) => ({
+                  role: msg.role,
+                  content: msg.content,
+                  files: msg.files || [],
+                  createdAt: msg.createdAt || new Date(),
+                  updatedAt: new Date(),
+                })
+              );
+            }
+
             updatedChat.messages.push(assistantMessage);
             updatedChat.updatedAt = new Date();
             await updatedChat.save();
@@ -299,7 +323,7 @@ export async function POST(req: Request) {
                 messageCount: updatedChat.messages.length,
                 hasFiles: hasFiles,
                 hasImages: hasImages,
-                userQuery: finalMessageContent.slice(0, 100), // First 100 chars for quick reference
+                userQuery: finalMessageContent.slice(0, 100),
                 responseLength: result.text.length,
               },
             });
@@ -317,7 +341,13 @@ export async function POST(req: Request) {
       console.error("Error saving chat:", error);
     }
 
-    return response.toDataStreamResponse();
+    return response.toDataStreamResponse({
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
   } catch (error) {
     // console.error("Error in chat API:", error);
     return new Response(
