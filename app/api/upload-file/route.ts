@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import cloudinary from "@/lib/cloudinary";
 import { UploadApiResponse } from "cloudinary";
-import { PDFDocument } from "pdf-lib";
 import mammoth from "mammoth";
-
+import { pdfToText } from "pdf-ts";
 const SUPPORTED_FILE_TYPES = {
   images: ["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"],
   documents: [
@@ -17,19 +16,13 @@ const SUPPORTED_FILE_TYPES = {
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
-    console.log("Starting PDF text extraction...");
-    const pdfDoc = await PDFDocument.load(buffer);
-    const pages = pdfDoc.getPages();
-
-    console.log(`PDF has ${pages.length} pages`);
-
-    const extractedText = `PDF document uploaded with ${pages.length} page(s). Content analysis available through vision model.`;
-
-    console.log("PDF processed successfully");
-    return extractedText;
+    console.log("Starting PDF text extraction with pdf-ts...");
+    const text = await pdfToText(buffer);
+    console.log("PDF text extracted successfully, length:", text.length);
+    return text;
   } catch (error) {
     console.error("Error extracting text from PDF:", error);
-    return "PDF document uploaded. Content analysis available through vision model.";
+    return `PDF document uploaded. Content analysis available through vision model.`;
   }
 }
 
