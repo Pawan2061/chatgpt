@@ -13,7 +13,6 @@ export interface ChatSidebarProps {
   availableChats: Record<string, ChatItem>;
   onNewChat: () => void;
   onSelectChat: (chatId: string) => void;
-  onEditChat: (chatId: string) => void;
   onDeleteChat: (chatId: string) => void;
   isMobileMenuOpen: boolean;
   onToggleMobileMenu: (open: boolean) => void;
@@ -25,7 +24,6 @@ export function ChatSidebar({
   availableChats,
   onNewChat,
   onSelectChat,
-  onEditChat,
   onDeleteChat,
   isMobileMenuOpen,
   onToggleMobileMenu,
@@ -44,7 +42,6 @@ export function ChatSidebar({
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  // Sort chats by updatedAt (most recent first)
   const sortedChats = Object.entries(availableChats).sort(([, a], [, b]) => {
     const aDate = new Date(a.updatedAt || a.createdAt);
     const bDate = new Date(b.updatedAt || b.createdAt);
@@ -53,8 +50,11 @@ export function ChatSidebar({
 
   const sidebarContent = (
     <div
-      className="flex flex-col h-full "
-      style={{ fontFamily: "Inter", fontWeight: 200 }}
+      className="flex flex-col h-full"
+      style={{
+        fontFamily: "ui-sans-serif, -apple-system, system-ui",
+        fontSize: "15px",
+      }}
     >
       <div className="flex-shrink-0 p-4">
         <div className="flex items-center justify-between mb-5">
@@ -120,8 +120,8 @@ export function ChatSidebar({
           >
             <div className="flex items-center gap-3">
               <svg
-                width="20"
-                height="20"
+                width="24"
+                height="24"
                 viewBox="0 0 20 20"
                 fill="currentColor"
                 xmlns="http://www.w3.org/2000/svg"
@@ -130,7 +130,13 @@ export function ChatSidebar({
               >
                 <path d="M2.6687 11.333V8.66699C2.6687 7.74455 2.66841 7.01205 2.71655 6.42285C2.76533 5.82612 2.86699 5.31731 3.10425 4.85156L3.25854 4.57617C3.64272 3.94975 4.19392 3.43995 4.85229 3.10449L5.02905 3.02149C5.44666 2.84233 5.90133 2.75849 6.42358 2.71582C7.01272 2.66769 7.74445 2.66797 8.66675 2.66797H9.16675C9.53393 2.66797 9.83165 2.96586 9.83179 3.33301C9.83179 3.70028 9.53402 3.99805 9.16675 3.99805H8.66675C7.7226 3.99805 7.05438 3.99834 6.53198 4.04102C6.14611 4.07254 5.87277 4.12568 5.65601 4.20313L5.45581 4.28906C5.01645 4.51293 4.64872 4.85345 4.39233 5.27149L4.28979 5.45508C4.16388 5.7022 4.08381 6.01663 4.04175 6.53125C3.99906 7.05373 3.99878 7.7226 3.99878 8.66699V11.333C3.99878 12.2774 3.99906 12.9463 4.04175 13.4688C4.08381 13.9833 4.16389 14.2978 4.28979 14.5449L4.39233 14.7285C4.64871 15.1465 5.01648 15.4871 5.45581 15.7109L5.65601 15.7969C5.87276 15.8743 6.14614 15.9265 6.53198 15.958C7.05439 16.0007 7.72256 16.002 8.66675 16.002H11.3337C12.2779 16.002 12.9461 16.0007 13.4685 15.958C13.9829 15.916 14.2976 15.8367 14.5447 15.7109L14.7292 15.6074C15.147 15.3511 15.4879 14.9841 15.7117 14.5449L15.7976 14.3447C15.8751 14.128 15.9272 13.8546 15.9587 13.4688C16.0014 12.9463 16.0017 12.2774 16.0017 11.333V10.833C16.0018 10.466 16.2997 10.1681 16.6667 10.168C17.0339 10.168 17.3316 10.4659 17.3318 10.833V11.333C17.3318 12.2555 17.3331 12.9879 17.2849 13.5771C17.2422 14.0993 17.1584 14.5541 16.9792 14.9717L16.8962 15.1484C16.5609 15.8066 16.0507 16.3571 15.4246 16.7412L15.1492 16.8955C14.6833 17.1329 14.1739 17.2354 13.5769 17.2842C12.9878 17.3323 12.256 17.332 11.3337 17.332H8.66675C7.74446 17.332 7.01271 17.3323 6.42358 17.2842C5.90135 17.2415 5.44665 17.1577 5.02905 16.9785L4.85229 16.8955C4.19396 16.5601 3.64271 16.0502 3.25854 15.4238L3.10425 15.1484C2.86697 14.6827 2.76534 14.1739 2.71655 13.5771C2.66841 12.9879 2.6687 12.2555 2.6687 11.333ZM13.4646 3.11328C14.4201 2.334 15.8288 2.38969 16.7195 3.28027L16.8865 3.46485C17.6141 4.35685 17.6143 5.64423 16.8865 6.53613L16.7195 6.7207L11.6726 11.7686C11.1373 12.3039 10.4624 12.6746 9.72827 12.8408L9.41089 12.8994L7.59351 13.1582C7.38637 13.1877 7.17701 13.1187 7.02905 12.9707C6.88112 12.8227 6.81199 12.6134 6.84155 12.4063L7.10132 10.5898L7.15991 10.2715C7.3262 9.53749 7.69692 8.86241 8.23218 8.32715L13.2791 3.28027L13.4646 3.11328ZM15.7791 4.2207C15.3753 3.81702 14.7366 3.79124 14.3035 4.14453L14.2195 4.2207L9.17261 9.26856C8.81541 9.62578 8.56774 10.0756 8.45679 10.5654L8.41772 10.7773L8.28296 11.7158L9.22241 11.582L9.43433 11.543C9.92426 11.432 10.3749 11.1844 10.7322 10.8271L15.7791 5.78027L15.8552 5.69629C16.185 5.29194 16.1852 4.708 15.8552 4.30371L15.7791 4.2207Z"></path>
               </svg>{" "}
-              <span className="text-[#FFFFFF] text-[14px] font-semibold leading-[22px] font-sans">
+              <span
+                className="text-[#FEFEFE] leading-[22px]"
+                style={{
+                  fontFamily: "ui-sans-serif, -apple-system, system-ui",
+                  fontSize: "17px",
+                }}
+              >
                 New chat
               </span>
             </div>
@@ -140,8 +146,14 @@ export function ChatSidebar({
             onClick={() => setIsSearchModalOpen(true)}
             className="w-full h-12 bg-transparent hover:bg-white/10 text-white flex items-center justify-start gap-3 px-4 rounded-lg"
           >
-            <Search className="h-5 w-5" />
-            <span className="text-[#FEFEFE] text-[17px] leading-[22px] font-semibold">
+            <Search className="h-6 w-6" />
+            <span
+              className="text-[#FEFEFE] leading-[22px]"
+              style={{
+                fontFamily: "ui-sans-serif, -apple-system, system-ui",
+                fontSize: "17px",
+              }}
+            >
               Search chats
             </span>
           </Button>
@@ -154,7 +166,13 @@ export function ChatSidebar({
             className="w-full h-12 bg-transparent hover:bg-white/10 text-white flex items-center justify-start gap-3 px-4 rounded-lg"
           >
             <Brain className="h-5 w-5" />
-            <span className="text-[#FFFFFF] text-[14px] font-semibold leading-[22px] font-sans">
+            <span
+              className="text-[#FEFEFE] leading-[22px]"
+              style={{
+                fontFamily: "ui-sans-serif, -apple-system, system-ui",
+                fontSize: "17px",
+              }}
+            >
               Memories
             </span>
           </Button>
@@ -164,7 +182,13 @@ export function ChatSidebar({
             className="w-full h-12 bg-transparent hover:bg-white/10 text-white flex items-center justify-start gap-3 px-4 rounded-lg"
           >
             <Play className="h-5 w-5" />
-            <span className="text-[#FFFFFF] text-[14px] font-semibold leading-[22px] font-sans">
+            <span
+              className="text-[#FEFEFE] leading-[22px]"
+              style={{
+                fontFamily: "ui-sans-serif, -apple-system, system-ui",
+                fontSize: "17px",
+              }}
+            >
               Sora
             </span>
           </Button>
@@ -174,7 +198,13 @@ export function ChatSidebar({
             className="w-full h-12 bg-transparent hover:bg-white/10 text-white flex items-center justify-start gap-3 px-4 rounded-lg"
           >
             <Grid3X3 className="h-5 w-5" />
-            <span className="text-[#FFFFFF] text-[14px] font-semibold leading-[22px] font-sans">
+            <span
+              className="text-[#FEFEFE] leading-[22px]"
+              style={{
+                fontFamily: "ui-sans-serif, -apple-system, system-ui",
+                fontSize: "17px",
+              }}
+            >
               GPTs
             </span>
           </Button>
@@ -183,11 +213,35 @@ export function ChatSidebar({
 
       <div className="flex-1 overflow-hidden">
         <div className="px-4 mb-4">
-          <h3 className="text-white/50  text-md tracking-wide font-semibold">
+          <h3
+            className="text-white/50 leading-[22px]"
+            style={{
+              fontFamily: "ui-sans-serif, -apple-system, system-ui",
+              fontSize: "17px",
+            }}
+          >
             Chats
           </h3>
         </div>
-        <ScrollArea className="h-full sidebar-scroll">
+        <ScrollArea
+          className="h-full sidebar-scroll"
+          style={{
+            scrollbarWidth: "none" /* Firefox */,
+            msOverflowStyle: "none" /* IE and Edge */,
+          }}
+        >
+          <style jsx global>{`
+            .sidebar-scroll::-webkit-scrollbar {
+              display: none;
+            }
+            .sidebar-scroll > div:first-child {
+              scrollbar-width: none !important;
+            }
+            .sidebar-scroll
+              [data-radix-scroll-area-viewport]::-webkit-scrollbar {
+              display: none;
+            }
+          `}</style>
           <div className="px-1.5">
             {isLoading ? (
               <div className="p-4">
@@ -224,110 +278,145 @@ export function ChatSidebar({
                 {sortedChats.map(([chatId, chat]) => (
                   <div
                     key={chatId}
-                    className={`group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 hover:bg-neutral-800/50 ${
-                      selectedChatId === chatId
-                        ? "bg-neutral-800 border border-neutral-700"
-                        : "hover:bg-neutral-800/30"
+                    className={`group relative flex items-center gap-2 p-3 rounded-xl cursor-pointer transition-all duration-200 hover:bg-neutral-800/50 ${
+                      selectedChatId === chatId ? "bg-neutral-800" : ""
                     }`}
                     onClick={() => onSelectChat(chatId)}
                   >
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          className="text-white"
-                        >
-                          <path
-                            d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </div>
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="text-white text-sm font-medium truncate">
-                        {chat.title || "New Chat"}
-                      </div>
-                      <div className="text-neutral-400 text-xs mt-1 flex items-center gap-2">
-                        <span>{chat.messages?.length || 0} messages</span>
-                        <span>•</span>
-                        <span>
-                          {formatDate(chat.updatedAt || chat.createdAt)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEditChat(chatId);
+                    {selectedChatId === chatId && (
+                      <div className="flex-shrink-0 h-2 w-2 bg-blue-500 rounded-full" />
+                    )}
+                    <div className="flex-1 min-w-0 flex items-center justify-between">
+                      <div
+                        className="text-[#FEFEFE] leading-[22px] truncate max-w-[85%]"
+                        style={{
+                          fontFamily: "ui-sans-serif, -apple-system, system-ui",
+                          fontSize: "17px",
                         }}
-                        className="p-1.5 hover:bg-neutral-700 rounded-lg transition-colors"
-                        title="Edit chat"
                       >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          className="text-neutral-400"
+                        {chat.title?.length > 30
+                          ? `${chat.title.substring(0, 30)}...`
+                          : chat.title || "New Chat"}
+                      </div>
+                      <div className="flex-shrink-0 relative">
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const menu = document.getElementById(
+                              `chat-menu-${chatId}`
+                            );
+                            if (menu) {
+                              menu.style.display =
+                                menu.style.display === "none"
+                                  ? "block"
+                                  : "none";
+                            }
+                          }}
+                          className="p-1 hover:bg-neutral-700 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                          title="Chat options"
                         >
-                          <path
-                            d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13"
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
                             stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <path
-                            d="M18.5 2.5C18.8978 2.10217 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.10217 21.5 2.5C21.8978 2.89783 22.1213 3.43739 22.1213 4C22.1213 4.56261 21.8978 5.10217 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteChat(chatId);
-                        }}
-                        className="p-1.5 hover:bg-red-600/20 hover:text-red-400 rounded-lg transition-colors"
-                        title="Delete chat"
-                      >
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          className="text-neutral-400"
+                            className="text-neutral-400"
+                          >
+                            <circle cx="12" cy="12" r="1" />
+                            <circle cx="19" cy="12" r="1" />
+                            <circle cx="5" cy="12" r="1" />
+                          </svg>
+                        </Button>
+                        <div
+                          id={`chat-menu-${chatId}`}
+                          className="absolute right-0 mt-1 w-48 bg-[#1a1a1a] rounded-lg shadow-lg py-1 z-50 hidden border border-neutral-700"
+                          style={{
+                            fontFamily:
+                              "ui-sans-serif, -apple-system, system-ui",
+                            fontSize: "15px",
+                          }}
                         >
-                          <path
-                            d="M3 6H5H21"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          <path
-                            d="M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectChat(chatId);
+                              const menu = document.getElementById(
+                                `chat-menu-${chatId}`
+                              );
+                              if (menu) menu.style.display = "none";
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-neutral-800 transition-colors flex items-center gap-2"
+                          >
+                            <svg
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              className="text-[#FEFEFE]"
+                            >
+                              <path
+                                d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <polyline
+                                points="15 3 21 3 21 9"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <line
+                                x1="10"
+                                y1="14"
+                                x2="21"
+                                y2="3"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                            <span className="text-[#FEFEFE]">Open chat</span>
+                          </button>
+                          <div className="h-[1px] bg-neutral-700 my-1 mx-3"></div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteChat(chatId);
+                              const menu = document.getElementById(
+                                `chat-menu-${chatId}`
+                              );
+                              if (menu) menu.style.display = "none";
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-neutral-800 transition-colors flex items-center gap-2"
+                          >
+                            <svg
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              className="text-red-400"
+                            >
+                              <path
+                                d="M3 6h18"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <path
+                                d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                            <span className="text-red-400">Delete</span>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -345,10 +434,22 @@ export function ChatSidebar({
           <div className="flex items-center gap-3">
             <Shield className="h-5 w-5 text-white/70" />
             <div className="flex flex-col items-start">
-              <span className="text-[#FEFEFE] text-[14px] leading-[20px] font-medium">
+              <span
+                className="text-[#FEFEFE] leading-[22px]"
+                style={{
+                  fontFamily: "ui-sans-serif, -apple-system, system-ui",
+                  fontSize: "14px",
+                }}
+              >
                 Upgrade plan
               </span>
-              <span className="text-white/60 text-[12px] leading-[16px] font-light">
+              <span
+                className="text-white/60 leading-[16px]"
+                style={{
+                  fontFamily: "ui-sans-serif, -apple-system, system-ui",
+                  fontSize: "14px",
+                }}
+              >
                 More access to the best models
               </span>
             </div>
@@ -368,7 +469,6 @@ export function ChatSidebar({
         onNewChat={onNewChat}
       />
 
-      {/* Mobile Backdrop Overlay */}
       {isMobileMenuOpen && (
         <div
           className="md:hidden fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
@@ -381,10 +481,9 @@ export function ChatSidebar({
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0 fixed md:relative z-50 ${
           isCollapsed ? "w-16" : "w-80"
-        } h-full bg-[#0f0f0f] border-r border-neutral-700/50 flex flex-col transition-all duration-300`}
+        } h-full bg-[#181818] border-r border-neutral-700/50 flex flex-col transition-all duration-300`}
       >
         {isCollapsed ? (
-          // Collapsed sidebar - minimal view
           <div className="flex flex-col h-full p-2">
             <div className="flex-shrink-0 mb-4">
               <div className="flex items-center justify-center mb-4">
@@ -427,7 +526,7 @@ export function ChatSidebar({
                   onNewChat();
                   onToggleMobileMenu(false);
                 }}
-                className="w-full p-2 h-10 bg-transparent hover:bg-white/10 text-white/70 hover:text-white rounded-md"
+                className="w-full p-2 h-10 bg-transparent hover:bg-white/10  hover:text-white rounded-md  text-[#FEFEFE] text-[20px] leading-[22px] font-light"
                 title="New chat"
               >
                 <svg
@@ -443,44 +542,6 @@ export function ChatSidebar({
                 </svg>
               </Button>
             </div>
-
-            {/* Collapsed chat list */}
-            <div className="flex-1 overflow-hidden">
-              <ScrollArea className="h-full">
-                <div className="space-y-1">
-                  {sortedChats.slice(0, 10).map(([chatId, chat]) => (
-                    <div
-                      key={chatId}
-                      className={`w-10 h-10 rounded-lg cursor-pointer transition-all duration-200 flex items-center justify-center ${
-                        selectedChatId === chatId
-                          ? "bg-neutral-800 border border-neutral-700"
-                          : "hover:bg-neutral-800/30"
-                      }`}
-                      onClick={() => onSelectChat(chatId)}
-                      title={chat.title}
-                    >
-                      <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-md flex items-center justify-center">
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          className="text-white"
-                        >
-                          <path
-                            d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
           </div>
         ) : (
           sidebarContent
@@ -488,21 +549,4 @@ export function ChatSidebar({
       </div>
     </>
   );
-}
-
-function formatDate(date: string | Date): string {
-  const d = new Date(date);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    return "Today";
-  } else if (diffDays === 1) {
-    return "Yesterday";
-  } else if (diffDays < 7) {
-    return `${diffDays} days ago`;
-  } else {
-    return d.toLocaleDateString();
-  }
 }

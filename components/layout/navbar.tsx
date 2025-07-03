@@ -49,7 +49,7 @@ export function Navbar({ onNewChat, className }: NavbarProps) {
   return (
     <nav
       className={cn(
-        "sticky top-0 z-50 w-full border-b border-neutral-800/50 bg-[#171717]/95 backdrop-blur-xl",
+        "sticky top-0 z-50 w-full border-b border-neutral-800/50 bg-[#212121]/95 backdrop-blur-xl",
         className
       )}
     >

@@ -63,9 +63,9 @@ export default function Home() {
     router.push(`/c/${newChatId}`);
   };
 
-  const handleEditChat = (chatId: string) => {
-    console.log("Edit chat:", chatId);
-  };
+  // const handleEditChat = (chatId: string) => {
+  //   console.log("Edit chat:", chatId);
+  // };
 
   const handleDeleteChat = async (chatId: string) => {
     try {
@@ -128,13 +128,12 @@ export default function Home() {
   };
 
   return (
-    <div className="flex h-screen bg-[#171717] overflow-hidden">
+    <div className="flex h-screen bg-[#212121] overflow-hidden">
       <ChatSidebar
         selectedChatId={selectedChatId || ""}
         availableChats={availableChats}
         onNewChat={handleNewChat}
         onSelectChat={handleSelectChat}
-        onEditChat={handleEditChat}
         onDeleteChat={handleDeleteChat}
         isMobileMenuOpen={isMobileMenuOpen}
         onToggleMobileMenu={setIsMobileMenuOpen}
