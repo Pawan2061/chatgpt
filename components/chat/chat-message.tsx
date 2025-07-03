@@ -21,33 +21,48 @@ export function ChatMessage({
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(message.content);
+  const [editedContent, setEditedContent] = useState(message.content);
+  const [imageLoadingStates, setImageLoadingStates] = useState<
+    Record<number, boolean>
+  >({});
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
   const handleEditStart = () => {
     setIsEditing(true);
-    setEditContent(message.content);
+    setEditedContent(message.content);
   };
 
   const handleEditCancel = () => {
     setIsEditing(false);
-    setEditContent(message.content);
+    setEditedContent(message.content);
   };
 
   const handleEditSave = () => {
     if (onEditMessage && messageIndex !== undefined) {
-      onEditMessage(messageIndex, editContent);
+      onEditMessage(messageIndex, editedContent);
     }
     setIsEditing(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
+    if (e.key === "Enter" && e.ctrlKey) {
       handleEditSave();
     } else if (e.key === "Escape") {
-      e.preventDefault();
       handleEditCancel();
     }
+  };
+
+  const handleImageLoad = (index: number) => {
+    setImageLoadingStates((prev) => ({ ...prev, [index]: false }));
+  };
+
+  const handleImageError = (index: number) => {
+    setImageLoadingStates((prev) => ({ ...prev, [index]: false }));
+    setImageErrors((prev) => ({ ...prev, [index]: true }));
+  };
+
+  const handleImageLoadStart = (index: number) => {
+    setImageLoadingStates((prev) => ({ ...prev, [index]: true }));
   };
 
   return (
@@ -72,8 +87,8 @@ export function ChatMessage({
           {isEditing ? (
             <div className="space-y-3">
               <Textarea
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
+                value={editedContent}
+                onChange={(e) => setEditedContent(e.target.value)}
                 onKeyDown={handleKeyDown}
                 className="w-full bg-[#2f2f2f] border border-neutral-600 text-white text-base placeholder:text-neutral-400 focus-visible:ring-1 focus-visible:ring-neutral-500 resize-none min-h-[100px] rounded-lg"
                 placeholder="Edit your message..."
@@ -89,7 +104,7 @@ export function ChatMessage({
                 </button>
                 <button
                   onClick={handleEditSave}
-                  disabled={!editContent.trim()}
+                  disabled={!editedContent.trim()}
                   className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 disabled:bg-neutral-600 disabled:text-neutral-400 text-white rounded-lg transition-colors"
                 >
                   <Check className="w-4 h-4" />
@@ -123,11 +138,44 @@ export function ChatMessage({
                         )}
                       >
                         {isImage ? (
-                          <img
-                            src={file.url}
-                            alt={file.name || "Uploaded image"}
-                            className="max-w-[300px] rounded-lg border border-neutral-700"
-                          />
+                          <div className="relative">
+                            {imageLoadingStates[index] && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-neutral-800 rounded-lg">
+                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400"></div>
+                              </div>
+                            )}
+                            {imageErrors[index] ? (
+                              <div className="flex items-center gap-2 text-red-400 bg-neutral-800/50 px-3 py-2 rounded-lg">
+                                <svg
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                >
+                                  <circle cx="12" cy="12" r="10" />
+                                  <line x1="12" y1="8" x2="12" y2="12" />
+                                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                                Failed to load image
+                              </div>
+                            ) : (
+                              <img
+                                src={file.url}
+                                alt={file.name || "Uploaded image"}
+                                className="max-w-[300px] rounded-lg border border-neutral-700"
+                                loading="lazy"
+                                onLoad={() => handleImageLoad(index)}
+                                onError={() => handleImageError(index)}
+                                onLoadStart={() => handleImageLoadStart(index)}
+                                style={{
+                                  opacity: imageLoadingStates[index] ? 0.5 : 1,
+                                  transition: "opacity 0.2s ease-in-out",
+                                }}
+                              />
+                            )}
+                          </div>
                         ) : isDocument ? (
                           <a
                             href={file.url}

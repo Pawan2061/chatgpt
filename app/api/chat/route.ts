@@ -215,7 +215,6 @@ export async function POST(req: Request) {
       content: systemContent,
     });
 
-    // Use frontend messages for editing, database messages for normal chat
     const messagesToUse = isEdit ? messages : chat.messages.slice(-10);
 
     for (const msg of messagesToUse) {
@@ -281,9 +280,7 @@ export async function POST(req: Request) {
 
           const updatedChat = await Chat.findOne({ _id: actualChatId, userId });
           if (updatedChat) {
-            // For edits, we need to update the database with the current frontend state
             if (isEdit && messages && messages.length > 0) {
-              // Replace the chat messages with the frontend messages + new assistant message
               updatedChat.messages = messages.map(
                 (msg: {
                   role: string;
@@ -349,7 +346,6 @@ export async function POST(req: Request) {
       },
     });
   } catch (error) {
-    // console.error("Error in chat API:", error);
     return new Response(
       JSON.stringify({
         error: "Internal Server Error",

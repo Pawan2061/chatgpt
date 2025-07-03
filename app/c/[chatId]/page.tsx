@@ -164,7 +164,7 @@ export default function ChatPage() {
       console.log("Chat finished:", message);
       setIsEditingMessage(false);
 
-      const reloadChat = async () => {
+      const reloadChatData = async () => {
         try {
           const response = await fetch(`/api/chats/${params.chatId}`);
           if (response.ok) {
@@ -179,27 +179,48 @@ export default function ChatPage() {
         }
       };
 
-      reloadChat();
-
-      const reloadAllChats = async () => {
-        try {
-          const response = await fetch("/api/chats");
-          if (response.ok) {
-            const chats = await response.json();
-            setAvailableChats(chats);
-          }
-        } catch (error) {
-          console.error("Error reloading all chats:", error);
-        }
-      };
-
-      setTimeout(reloadAllChats, 1000);
+      setTimeout(() => {
+        reloadChatData();
+      }, 500);
     },
     onError: (error) => {
       console.error("Chat error:", error);
       setIsEditingMessage(false);
     },
   });
+
+  const convertDbFilesToUploadedFiles = (
+    files: string[] | undefined
+  ): UploadedFile[] => {
+    if (!files || !Array.isArray(files)) return [];
+
+    return files.map((url: string) => {
+      const fileName = url.split("/").pop() || "file";
+      const isImage = /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(url);
+      return {
+        url,
+        name: fileName,
+        type: isImage ? "image" : "document",
+        extractedContent: undefined,
+      };
+    });
+  };
+
+  useEffect(() => {
+    if (currentChat?.messages && messages.length === 0 && params.chatId) {
+      const updatedMessages = currentChat.messages.map(
+        (msg: ChatMessageWithFiles, index: number) => ({
+          id: msg.id || `msg-${index}`,
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+          createdAt: new Date(msg.createdAt),
+          files: convertDbFilesToUploadedFiles(msg.files),
+        })
+      );
+
+      setMessages(updatedMessages);
+    }
+  }, [currentChat?.messages, messages.length, params.chatId, setMessages]);
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,7 +239,6 @@ export default function ChatPage() {
     }
   };
 
-  // Simplified message editing using useChat
   const handleEditMessage = async (
     messageIndex: number,
     newContent: string
@@ -235,20 +255,16 @@ export default function ChatPage() {
         newContent
       );
 
-      // Update the message content in the local state
       const updatedMessages = [...messages];
       updatedMessages[messageIndex] = {
         ...updatedMessages[messageIndex],
         content: newContent,
       };
 
-      // Remove messages after the edited one
       const messagesUpToEdit = updatedMessages.slice(0, messageIndex + 1);
 
-      // Update the messages state
       setMessages(messagesUpToEdit);
 
-      // Use reload to regenerate the response with the updated messages
       await reload({
         body: {
           chatId: params.chatId,
@@ -263,7 +279,6 @@ export default function ChatPage() {
     }
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -391,31 +406,28 @@ export default function ChatPage() {
               )}
 
               {messages.map((message: Message, index: number) => {
-                const isLastUserMessage =
-                  index === messages.length - 2 && message.role === "user";
-                let files = isLastUserMessage
-                  ? uploadedFiles
-                  : (message as MessageWithFiles).files;
+                // Get files from the message itself (from database) or from current upload state
+                let files = (message as MessageWithFiles).files;
 
-                // If the message has files in the URL format, convert them to the proper format
-                if (
+                // If this is the very last message and it's a user message that was just sent,
+                // and it doesn't have files attached yet, use the current uploadedFiles
+                const isCurrentUserMessage =
+                  index === messages.length - 1 &&
+                  message.role === "user" &&
+                  (!files || files.length === 0) &&
+                  uploadedFiles.length > 0;
+
+                if (isCurrentUserMessage) {
+                  files = uploadedFiles;
+                } else if (
                   Array.isArray(files) &&
                   files.length > 0 &&
                   typeof files[0] === "string"
                 ) {
-                  const stringFiles = files as unknown as string[];
-                  files = stringFiles.map((url) => {
-                    const fileName = url.split("/").pop() || "file";
-                    const isImage = /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(
-                      url
-                    );
-                    return {
-                      url,
-                      name: fileName,
-                      type: isImage ? "image" : "document",
-                      extractedContent: undefined,
-                    };
-                  });
+                  // Convert database file URLs to proper format
+                  files = convertDbFilesToUploadedFiles(
+                    files as unknown as string[]
+                  );
                 }
 
                 return (
