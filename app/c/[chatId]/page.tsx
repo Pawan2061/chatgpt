@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChatItem } from "@/types/type";
 import { ChatMessage } from "@/components/chat/chat-message";
 import { FileUpload, UploadedFile } from "@/components/ui/file-upload";
-import { Upload, Paperclip } from "lucide-react";
+import { Paperclip } from "lucide-react";
 
 interface MessageWithFiles extends Message {
   files?: UploadedFile[];
@@ -37,6 +37,11 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Keep track of which user messages have files
+  const [messageFiles, setMessageFiles] = useState<
+    Record<number, UploadedFile[]>
+  >({});
 
   useEffect(() => {
     const loadChats = async () => {
@@ -160,7 +165,7 @@ export default function ChatPage() {
     onResponse: () => {
       setUploadedFiles([]);
     },
-    onFinish: (message) => {
+    onFinish: async (message) => {
       console.log("Chat finished:", message);
       setIsEditingMessage(false);
 
@@ -190,17 +195,31 @@ export default function ChatPage() {
   });
 
   const convertDbFilesToUploadedFiles = (
-    files: string[] | undefined
+    files: string[] | UploadedFile[] | undefined
   ): UploadedFile[] => {
     if (!files || !Array.isArray(files)) return [];
 
-    return files.map((url: string) => {
-      const fileName = url.split("/").pop() || "file";
-      const isImage = /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(url);
+    return files.map((file: string | UploadedFile) => {
+      if (typeof file === "object" && file.url) {
+        return file;
+      }
+
+      if (typeof file === "string") {
+        const fileName = file.split("/").pop() || "file";
+        const isImage = /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(file);
+
+        return {
+          url: file,
+          name: fileName,
+          type: isImage ? "image" : "document",
+          extractedContent: undefined,
+        };
+      }
+
       return {
-        url,
-        name: fileName,
-        type: isImage ? "image" : "document",
+        url: String(file),
+        name: "unknown",
+        type: "document" as const,
         extractedContent: undefined,
       };
     });
@@ -230,6 +249,14 @@ export default function ChatPage() {
 
     if (!hasText && !hasFiles) {
       return;
+    }
+
+    if (hasFiles) {
+      const nextMessageIndex = messages.length;
+      setMessageFiles((prev) => ({
+        ...prev,
+        [nextMessageIndex]: [...uploadedFiles],
+      }));
     }
 
     try {
@@ -406,11 +433,19 @@ export default function ChatPage() {
               )}
 
               {messages.map((message: Message, index: number) => {
-                // Get files from the message itself (from database) or from current upload state
                 let files = (message as MessageWithFiles).files;
 
-                // If this is the very last message and it's a user message that was just sent,
-                // and it doesn't have files attached yet, use the current uploadedFiles
+                if (files && Array.isArray(files)) {
+                  files = convertDbFilesToUploadedFiles(files);
+                }
+
+                if (message.role === "user" && (!files || files.length === 0)) {
+                  const trackedFiles = messageFiles[index];
+                  if (trackedFiles && trackedFiles.length > 0) {
+                    files = trackedFiles;
+                  }
+                }
+
                 const isCurrentUserMessage =
                   index === messages.length - 1 &&
                   message.role === "user" &&
@@ -419,15 +454,6 @@ export default function ChatPage() {
 
                 if (isCurrentUserMessage) {
                   files = uploadedFiles;
-                } else if (
-                  Array.isArray(files) &&
-                  files.length > 0 &&
-                  typeof files[0] === "string"
-                ) {
-                  // Convert database file URLs to proper format
-                  files = convertDbFilesToUploadedFiles(
-                    files as unknown as string[]
-                  );
                 }
 
                 return (
@@ -450,12 +476,22 @@ export default function ChatPage() {
 
               {(isLoading || isEditingMessage) &&
                 messages[messages.length - 1]?.role !== "assistant" && (
-                  <div className="text-white/70 text-center py-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="animate-spin w-4 h-4 border-2 border-white/20 border-t-white/70 rounded-full"></div>
-                      {isEditingMessage
-                        ? "Regenerating response..."
-                        : "ChatGPT is thinking..."}
+                  <div className="flex items-start md:px-4 mb-4">
+                    <div className="flex w-full max-w-[800px] mx-auto items-start gap-4 px-4 py-6">
+                      <div className="flex-1 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                            <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                            <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce"></div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="h-4 bg-neutral-700/30 rounded-md animate-pulse"></div>
+                          <div className="h-4 bg-neutral-700/30 rounded-md animate-pulse w-4/5"></div>
+                          <div className="h-4 bg-neutral-700/30 rounded-md animate-pulse w-3/5"></div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -469,7 +505,7 @@ export default function ChatPage() {
               onSubmit={handleFormSubmit}
               className="w-full max-w-[800px] mx-auto px-4"
             >
-              <div className="relative backdrop-blur-sm rounded-2xl border border-neutral-700/50 shadow-2xl shadow-black/20 transition-all duration-200 hover:border-neutral-600/50 focus-within:border-neutral-500/50">
+              <div className="relative rounded-2xl border border-neutral-700 bg-[#2f2f2f] shadow-lg transition-all duration-200 hover:border-neutral-600 focus-within:border-neutral-500">
                 <div className="relative flex items-end">
                   <Textarea
                     value={input}
@@ -480,22 +516,26 @@ export default function ChatPage() {
                         handleFormSubmit(e);
                       }
                     }}
-                    placeholder="Message ChatGPT..."
-                    className="w-full bg-[#1f1f1f] border-none text-white text-lg placeholder:text-neutral-400 focus-visible:ring-0 resize-none py-4 px-4 pr-24 min-h-[56px] max-h-96 transition-all duration-300 rounded-2xl"
+                    placeholder={
+                      isLoading || isEditingMessage
+                        ? "Please wait..."
+                        : "Message ChatGPT..."
+                    }
+                    className="w-full bg-transparent border-none text-white text-base placeholder:text-neutral-400 focus-visible:ring-0 resize-none py-4 px-4 pr-16 min-h-[56px] max-h-96 rounded-2xl"
                     disabled={isLoading || isEditingMessage}
                   />
+
                   <div className="absolute right-2 bottom-3 flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isLoading || isEditingMessage}
-                      className="p-1.5 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Upload files (Images, PDF, DOCX, TXT)"
+                      className="p-2 hover:bg-neutral-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isUploading ? (
-                        <Upload className="h-5 w-5 animate-spin text-neutral-400" />
+                        <div className="w-5 h-5 border-2 border-neutral-600 border-t-white rounded-full animate-spin"></div>
                       ) : (
-                        <Paperclip className="h-5 w-5 text-neutral-400 hover:text-white transition-colors" />
+                        <Paperclip className="h-5 w-5 text-neutral-400" />
                       )}
                     </button>
                     <button
@@ -505,23 +545,27 @@ export default function ChatPage() {
                         isEditingMessage ||
                         (!input.trim() && uploadedFiles.length === 0)
                       }
-                      className="p-1.5 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2 hover:bg-neutral-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        className="text-neutral-400 hover:text-white transition-colors"
-                      >
-                        <path
-                          d="M7 11L12 6L17 11M12 18V7"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
+                      {isLoading || isEditingMessage ? (
+                        <div className="w-5 h-5 border-2 border-neutral-600 border-t-white rounded-full animate-spin"></div>
+                      ) : (
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          className="text-neutral-400"
+                        >
+                          <path
+                            d="M7 11L12 6L17 11M12 18V7"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -532,10 +576,11 @@ export default function ChatPage() {
                   onChange={handleFileSelect}
                   className="hidden"
                   multiple
+                  accept="image/*,.pdf,.doc,.docx,.txt,.md"
                 />
 
                 {uploadedFiles.length > 0 && (
-                  <div className="px-4 pb-3 pt-2">
+                  <div className="px-4 pb-3 pt-2 border-t border-neutral-700/30">
                     <FileUpload
                       onFileUpload={handleFileUpload}
                       onFileRemove={handleFileRemove}
