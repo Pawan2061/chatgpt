@@ -11,7 +11,7 @@ export async function GET() {
     }
 
     const response = await mem0Client.getAll({
-      user_id: "test-user",
+      user_id: user.id,
     });
 
     return NextResponse.json(response);
