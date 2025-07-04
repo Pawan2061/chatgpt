@@ -500,12 +500,12 @@ export default function ChatPage() {
             </div>
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#171717] via-[#171717] to-transparent pt-6 pb-6">
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#212121] via-[#212121] to-transparent pt-8 pb-8">
             <form
               onSubmit={handleFormSubmit}
-              className="w-full max-w-[800px] mx-auto px-4"
+              className="w-full max-w-[800px] mx-auto px-6"
             >
-              <div className="relative rounded-2xl border border-neutral-700 bg-[#2f2f2f] shadow-lg transition-all duration-200 hover:border-neutral-600 focus-within:border-neutral-500">
+              <div className="relative rounded-3xl border border-neutral-600/30 bg-[#2f2f2f] shadow-2xl transition-all duration-200 hover:border-neutral-500/50 focus-within:border-neutral-400/70">
                 <div className="relative flex items-end">
                   <Textarea
                     value={input}
@@ -513,29 +513,33 @@ export default function ChatPage() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        handleFormSubmit(e);
+                        if (
+                          !isLoading &&
+                          !isEditingMessage &&
+                          (input.trim() || uploadedFiles.length > 0)
+                        ) {
+                          handleFormSubmit(e);
+                        }
                       }
                     }}
                     placeholder={
-                      isLoading || isEditingMessage
-                        ? "Please wait..."
-                        : "Message ChatGPT..."
+                      isEditingMessage ? "Please wait..." : "Ask anything"
                     }
-                    className="w-full bg-transparent border-none text-white text-base placeholder:text-neutral-400 focus-visible:ring-0 resize-none py-4 px-4 pr-16 min-h-[56px] max-h-96 rounded-2xl"
-                    disabled={isLoading || isEditingMessage}
+                    className="w-full bg-transparent border-none text-white text-xl placeholder:text-neutral-500 focus-visible:ring-0 resize-none py-6 px-6 pr-24 min-h-[80px] max-h-96 rounded-3xl leading-relaxed font-normal"
+                    disabled={isEditingMessage}
                   />
 
-                  <div className="absolute right-2 bottom-3 flex items-center gap-1">
+                  <div className="absolute right-4 bottom-4 flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={isLoading || isEditingMessage}
-                      className="p-2 hover:bg-neutral-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isEditingMessage}
+                      className="p-3 hover:bg-neutral-600/40 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isUploading ? (
-                        <div className="w-5 h-5 border-2 border-neutral-600 border-t-white rounded-full animate-spin"></div>
+                        <div className="w-6 h-6 border-2 border-neutral-500 border-t-white rounded-full animate-spin"></div>
                       ) : (
-                        <Paperclip className="h-5 w-5 text-neutral-400" />
+                        <Paperclip className="h-6 w-6 text-neutral-400 hover:text-neutral-300" />
                       )}
                     </button>
                     <button
@@ -545,17 +549,17 @@ export default function ChatPage() {
                         isEditingMessage ||
                         (!input.trim() && uploadedFiles.length === 0)
                       }
-                      className="p-2 hover:bg-neutral-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-3 bg-white hover:bg-neutral-200 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-neutral-600"
                     >
                       {isLoading || isEditingMessage ? (
-                        <div className="w-5 h-5 border-2 border-neutral-600 border-t-white rounded-full animate-spin"></div>
+                        <div className="w-6 h-6 border-2 border-neutral-600 border-t-neutral-800 rounded-full animate-spin"></div>
                       ) : (
                         <svg
-                          width="20"
-                          height="20"
+                          width="24"
+                          height="24"
                           viewBox="0 0 24 24"
                           fill="none"
-                          className="text-neutral-400"
+                          className="text-neutral-800"
                         >
                           <path
                             d="M7 11L12 6L17 11M12 18V7"
@@ -580,12 +584,12 @@ export default function ChatPage() {
                 />
 
                 {uploadedFiles.length > 0 && (
-                  <div className="px-4 pb-3 pt-2 border-t border-neutral-700/30">
+                  <div className="px-6 pb-5 pt-3 border-t border-neutral-600/30">
                     <FileUpload
                       onFileUpload={handleFileUpload}
                       onFileRemove={handleFileRemove}
                       uploadedFiles={uploadedFiles}
-                      disabled={isLoading || isEditingMessage}
+                      disabled={isEditingMessage}
                       hideButton
                     />
                   </div>

@@ -3,7 +3,7 @@ import { openai } from "@ai-sdk/openai";
 import { Chat, IMessage } from "@/lib/models/chat";
 import connectDB from "@/lib/db";
 import mongoose from "mongoose";
-import { addMemory, searchMemories } from "@/lib/mem0";
+import { addMemory, prepareContextWithMemory } from "@/lib/mem0";
 import { currentUser } from "@clerk/nextjs/server";
 
 export async function POST(req: Request) {
@@ -148,97 +148,81 @@ export async function POST(req: Request) {
       chat.messages.length
     );
 
-    console.log("=== Memory Integration ===");
-
-    let relevantMemories = await searchMemories(messageContent, {
-      userId,
-      limit: 5,
-      threshold: 0.5,
-    });
-
-    if (
-      relevantMemories.length === 0 &&
-      (messageContent.toLowerCase().includes("know about me") ||
-        messageContent.toLowerCase().includes("about me") ||
-        messageContent.toLowerCase().includes("who am i") ||
-        messageContent.toLowerCase().includes("my name") ||
-        messageContent.toLowerCase().includes("personal"))
-    ) {
-      console.log("Trying broader search for user information...");
-      const userInfoSearches = [
-        "user information personal details",
-        "name developer",
-        "user profile",
-      ];
-
-      for (const searchTerm of userInfoSearches) {
-        const additionalMemories = await searchMemories(searchTerm, {
-          userId,
-          limit: 3,
-          threshold: 0.4,
-        });
-        relevantMemories.push(...additionalMemories);
-        if (relevantMemories.length > 0) break;
-      }
-    }
-
-    relevantMemories = relevantMemories.filter(
-      (memory, index, self) =>
-        index === self.findIndex((m) => m.id === memory.id)
-    );
-
-    console.log("Found relevant memories:", relevantMemories.length);
-    if (relevantMemories.length > 0) {
-      console.log(
-        "Memory details:",
-        relevantMemories.map((m) => ({
-          memory: m.memory.substring(0, 100) + "...",
-          score: m.score,
-        }))
-      );
-    }
-
     const hasImages = imageFiles.length > 0;
     const modelToUse = hasImages ? "gpt-4o" : "gpt-4-turbo";
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const contextMessages: any[] = [];
+    console.log("=== Context Window Management ===");
+    console.log("Using model:", modelToUse);
+    console.log("Has images:", hasImages);
 
-    let systemContent =
-      "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using Markdown. When analyzing images, provide detailed and helpful descriptions and answers.";
+    // Prepare messages for context window management
+    const messagesToProcess = isEdit ? messages : chat.messages;
 
-    if (documentContext.length > 0) {
-      systemContent += `\n\nThe user has uploaded the following documents for analysis:\n\n${documentContext.join(
-        "\n\n"
-      )}\n\nUse this document content to answer the user's questions about the uploaded files.`;
+    const recentMessages = messagesToProcess.map((msg: IMessage) => ({
+      role: msg.role,
+      content: msg.content,
+      files: msg.files,
+      createdAt: msg.createdAt,
+      updatedAt: msg.updatedAt,
+    }));
+
+    let contextMessages;
+    try {
+      contextMessages = await prepareContextWithMemory(
+        finalMessageContent,
+        recentMessages,
+        userId,
+        modelToUse
+      );
+      console.log(
+        "Context prepared successfully with",
+        contextMessages.length,
+        "messages"
+      );
+    } catch (error) {
+      console.error(
+        "Error in context preparation, falling back to simple logic:",
+        error
+      );
+
+      const fallbackMessages = isEdit ? messages : chat.messages.slice(-10);
+      contextMessages = [
+        {
+          role: "system",
+          content:
+            "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using Markdown. When analyzing images, provide detailed and helpful descriptions and answers.",
+        },
+        ...fallbackMessages.map((msg: IMessage) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+      ];
     }
 
-    if (relevantMemories.length > 0) {
-      const memoryContext = relevantMemories.map((m) => m.memory).join("\n\n");
+    if (documentContext.length > 0 || hasImages) {
+      const systemMessageIndex = contextMessages.findIndex(
+        (msg) => msg.role === "system"
+      );
+      if (systemMessageIndex !== -1) {
+        let systemContent = contextMessages[systemMessageIndex].content;
 
-      systemContent += `\n\nIMPORTANT: You have access to relevant information from previous conversations with this user. Use this context to provide personalized and informed responses:\n\n${memoryContext}\n\nReference this information when relevant to the user's current question.`;
-    }
+        if (documentContext.length > 0) {
+          systemContent += `\n\nThe user has uploaded the following documents for analysis:\n\n${documentContext.join(
+            "\n\n"
+          )}\n\nUse this document content to answer the user's questions about the uploaded files.`;
+        }
 
-    contextMessages.push({
-      role: "system",
-      content: systemContent,
-    });
+        contextMessages[systemMessageIndex].content = systemContent;
+      }
 
-    const messagesToUse = isEdit ? messages : chat.messages.slice(-10);
+      if (hasImages) {
+        const lastMessage = contextMessages[contextMessages.length - 1];
+        if (lastMessage && lastMessage.role === "user") {
+          const parts: Array<{ type: string; text?: string; image?: string }> =
+            [];
 
-    for (const msg of messagesToUse) {
-      if (msg.role === "user") {
-        if (
-          msg.files &&
-          msg.files.length > 0 &&
-          hasImages &&
-          msg === messagesToUse[messagesToUse.length - 1]
-        ) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const parts: any[] = [];
-
-          if (msg.content.trim()) {
-            parts.push({ type: "text", text: msg.content });
+          if (lastMessage.content.trim()) {
+            parts.push({ type: "text", text: lastMessage.content });
           }
 
           imageFiles.forEach((imageUrl: string) => {
@@ -248,27 +232,12 @@ export async function POST(req: Request) {
             });
           });
 
-          contextMessages.push({
-            role: "user",
-            content: parts,
-          });
-        } else {
-          contextMessages.push({
-            role: "user",
-            content: msg.content,
-          });
+          lastMessage.content = parts;
         }
-      } else if (msg.role === "assistant") {
-        contextMessages.push({
-          role: "assistant",
-          content: msg.content,
-        });
       }
     }
 
-    console.log("Using model:", modelToUse);
-    console.log("Has images:", hasImages);
-    console.log("Prepared", contextMessages.length, "messages for OpenAI API");
+    console.log("Final context messages count:", contextMessages.length);
 
     const response = await streamText({
       model: openai(modelToUse),

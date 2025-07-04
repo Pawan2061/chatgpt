@@ -90,7 +90,7 @@ export function ChatMessage({
                   <button
                     onClick={handleEditSave}
                     disabled={!editedContent.trim()}
-                    className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 disabled:bg-neutral-600 disabled:text-neutral-400 text-white rounded-lg transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm bg-neutral-700 hover:bg-neutral-800 disabled:bg-neutral-600 disabled:text-neutral-400 text-white rounded-lg transition-colors"
                   >
                     <Check className="w-4 h-4" />
                     Save & Submit
