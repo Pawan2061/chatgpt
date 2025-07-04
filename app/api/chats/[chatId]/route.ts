@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { Chat } from "@/lib/models/chat";
-import connectToDatabase from "@/lib/db";
+import connectDB from "@/lib/db";
 
 export async function GET(
   req: Request,
@@ -14,7 +14,7 @@ export async function GET(
 
     console.log("GET chat request - ChatId:", chatId, "UserId:", userId);
 
-    await connectToDatabase();
+    await connectDB();
 
     const chat = await Chat.findOne({ _id: chatId, userId });
 
@@ -49,7 +49,7 @@ export async function DELETE(
 
     console.log("DELETE chat request - ChatId:", chatId, "UserId:", userId);
 
-    await connectToDatabase();
+    await connectDB();
 
     const result = await Chat.deleteOne({ _id: chatId, userId });
 

@@ -7,7 +7,7 @@ import { ChatItem } from "@/types/type";
 import { Textarea } from "@/components/ui/textarea";
 import { useRouter } from "next/navigation";
 import { FileUpload, UploadedFile } from "@/components/ui/file-upload";
-import { Upload, Paperclip } from "lucide-react";
+import { Paperclip } from "lucide-react";
 
 export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -196,12 +196,12 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#171717] via-[#171717] to-transparent pt-6 pb-6">
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#212121] via-[#212121] to-transparent pt-8 pb-8">
             <form
               onSubmit={handleFormSubmit}
-              className="w-full max-w-[800px] mx-auto px-4"
+              className="w-full max-w-[800px] mx-auto px-6"
             >
-              <div className="relative backdrop-blur-sm rounded-2xl border border-neutral-700/50 shadow-2xl shadow-black/20 transition-all duration-200 hover:border-neutral-600/50 focus-within:border-neutral-500/50">
+              <div className="relative rounded-3xl border border-neutral-600/30 bg-[#2f2f2f] shadow-2xl transition-all duration-200 hover:border-neutral-500/50 focus-within:border-neutral-400/70">
                 <div className="relative flex items-end">
                   <Textarea
                     value={input}
@@ -213,32 +213,32 @@ export default function Home() {
                       }
                     }}
                     placeholder="Message ChatGPT..."
-                    className="w-full bg-[#1f1f1f] border-none text-white text-lg placeholder:text-neutral-400 focus-visible:ring-0 resize-none py-4 px-4 pr-24 min-h-[56px] max-h-96 transition-all duration-300 rounded-2xl"
+                    className="w-full bg-transparent border-none text-white text-xl placeholder:text-neutral-500 focus-visible:ring-0 resize-none py-6 px-6 pr-24 min-h-[80px] max-h-96 rounded-3xl leading-relaxed font-normal"
                   />
-                  <div className="absolute right-2 bottom-3 flex items-center gap-1">
+                  <div className="absolute right-4 bottom-4 flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="p-1.5 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-3 hover:bg-neutral-600/40 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Upload files (Images, PDF, DOCX, TXT)"
                     >
                       {isUploading ? (
-                        <Upload className="h-5 w-5 animate-spin text-neutral-400" />
+                        <div className="w-6 h-6 border-2 border-neutral-500 border-t-white rounded-full animate-spin"></div>
                       ) : (
-                        <Paperclip className="h-5 w-5 text-neutral-400 hover:text-white transition-colors" />
+                        <Paperclip className="h-6 w-6 text-neutral-400 hover:text-neutral-300" />
                       )}
                     </button>
                     <button
                       type="submit"
                       disabled={!input.trim() && uploadedFiles.length === 0}
-                      className="p-1.5 hover:bg-neutral-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-3 bg-white hover:bg-neutral-200 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-neutral-600"
                     >
                       <svg
-                        width="20"
-                        height="20"
+                        width="24"
+                        height="24"
                         viewBox="0 0 24 24"
                         fill="none"
-                        className="text-neutral-400 hover:text-white transition-colors"
+                        className="text-neutral-800"
                       >
                         <path
                           d="M7 11L12 6L17 11M12 18V7"
@@ -258,10 +258,11 @@ export default function Home() {
                   onChange={handleFileSelect}
                   className="hidden"
                   multiple
+                  accept="image/*,.pdf,.doc,.docx,.txt,.md"
                 />
 
                 {uploadedFiles.length > 0 && (
-                  <div className="px-4 pb-3 pt-2">
+                  <div className="px-6 pb-5 pt-3 border-t border-neutral-600/30">
                     <FileUpload
                       onFileUpload={handleFileUpload}
                       onFileRemove={handleFileRemove}

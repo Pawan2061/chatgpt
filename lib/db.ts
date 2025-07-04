@@ -1,24 +1,35 @@
-import mongoose, { Connection as MongooseConnection } from "mongoose";
+import mongoose from "mongoose";
 
 declare global {
   // eslint-disable-next-line no-var
-  var mongoose:
+  var mongooseCache:
     | {
-        conn: MongooseConnection | null;
+        conn: typeof mongoose | null;
         promise: Promise<typeof mongoose> | null;
       }
     | undefined;
 }
 
-interface ConnectionState {
-  isConnected?: number;
+let cached = global.mongooseCache;
+
+if (!cached) {
+  cached = global.mongooseCache = { conn: null, promise: null };
 }
 
-const connection: ConnectionState = {};
-
 async function connectDB() {
-  if (connection.isConnected) {
-    return;
+  if (!cached) {
+    cached = global.mongooseCache = { conn: null, promise: null };
+  }
+
+  if (cached.conn) {
+    console.log("Using cached MongoDB connection");
+    return cached.conn;
+  }
+
+  if (cached.promise) {
+    console.log("Waiting for existing MongoDB connection promise");
+    cached.conn = await cached.promise;
+    return cached.conn;
   }
 
   const MONGODB_URI = process.env.MONGODB_URI;
@@ -32,18 +43,26 @@ async function connectDB() {
   }
 
   try {
-    const db = await mongoose.connect(MONGODB_URI, {
+    // Create a new connection promise
+    cached.promise = mongoose.connect(MONGODB_URI, {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 45000,
       connectTimeoutMS: 30000,
-      bufferCommands: false,
+      // Removed bufferCommands: false as it can cause issues in serverless environments
     });
-    connection.isConnected = db.connections[0].readyState;
+
+    // Wait for the connection to be established
+    cached.conn = await cached.promise;
+
     console.log("MongoDB Connected Successfully!");
-    console.log("Database name:", db.connections[0].name);
-    return db;
+    console.log("Database name:", cached.conn.connections[0].name);
+    console.log("Connection state:", cached.conn.connections[0].readyState);
+
+    return cached.conn;
   } catch (error) {
+    // Clear the promise if connection fails
+    cached.promise = null;
     console.error("Error connecting to MongoDB:", error);
     if (error instanceof Error) {
       console.error("Error name:", error.name);
