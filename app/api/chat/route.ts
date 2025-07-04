@@ -110,15 +110,18 @@ export async function POST(req: Request) {
       );
     }
 
-    let finalMessageContent = messageContent;
+    const finalMessageContent = messageContent;
     const imageFiles: string[] = [];
+    const documentContext: string[] = [];
 
     if (hasFiles) {
       for (const file of files) {
         if (file.type === "image") {
           imageFiles.push(file.url);
         } else if (file.type === "document" && file.extractedContent) {
-          finalMessageContent += `\n\n--- Document: ${file.name} ---\n${file.extractedContent}\n--- End of Document ---`;
+          documentContext.push(
+            `Document "${file.name}":\n${file.extractedContent}`
+          );
         }
       }
     }
@@ -203,6 +206,12 @@ export async function POST(req: Request) {
 
     let systemContent =
       "You are ChatGPT, a large language model trained by OpenAI. Follow the user's instructions carefully. Respond using Markdown. When analyzing images, provide detailed and helpful descriptions and answers.";
+
+    if (documentContext.length > 0) {
+      systemContent += `\n\nThe user has uploaded the following documents for analysis:\n\n${documentContext.join(
+        "\n\n"
+      )}\n\nUse this document content to answer the user's questions about the uploaded files.`;
+    }
 
     if (relevantMemories.length > 0) {
       const memoryContext = relevantMemories.map((m) => m.memory).join("\n\n");

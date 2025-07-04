@@ -181,14 +181,12 @@ export function ChatMessage({
                   </div>
                 )}
 
-                {/* User message bubble */}
                 <div className="bg-[#2f2f2f] text-white px-4 py-3 rounded-3xl max-w-fit">
                   <div className="text-[15px] leading-relaxed">
                     {message.content}
                   </div>
                 </div>
 
-                {/* Edit button */}
                 {onEditMessage && messageIndex !== undefined && (
                   <button
                     onClick={handleEditStart}
