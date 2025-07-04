@@ -107,6 +107,74 @@ const preprocessMathContent = (content: string): string => {
   }
 };
 
+const preprocessTableContent = (content: string): string => {
+  try {
+    // Convert text-based tables to proper markdown tables
+    const lines = content.split("\n");
+    const processedLines: string[] = [];
+    let inTable = false;
+    let tableLines: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      // Check if this line looks like a table row (starts and ends with |)
+      if (line.startsWith("|") && line.endsWith("|") && line.includes("|")) {
+        if (!inTable) {
+          inTable = true;
+          tableLines = [];
+        }
+
+        // Clean up the line - remove extra spaces and dashes
+        const cleanLine = line
+          .replace(/\|\s*-+\s*\|/g, "|---|") // Convert dash separators
+          .replace(/\|\s*-+\s*/g, "|---") // Convert dash separators at start/end
+          .replace(/\s*-+\s*\|/g, "---|") // Convert dash separators at start/end
+          .replace(/\s+/g, " ") // Normalize spaces
+          .trim();
+
+        tableLines.push(cleanLine);
+      } else {
+        if (inTable && tableLines.length > 0) {
+          // We've finished a table, process it
+          if (tableLines.length >= 2) {
+            // Add header separator if not present
+            const hasHeaderSeparator = tableLines[1].includes("---");
+            if (!hasHeaderSeparator) {
+              const headerCols = tableLines[0].split("|").length - 2;
+              const separator =
+                "|" + Array(headerCols).fill("---").join("|") + "|";
+              tableLines.splice(1, 0, separator);
+            }
+          }
+          processedLines.push(...tableLines);
+          tableLines = [];
+          inTable = false;
+        }
+        processedLines.push(line);
+      }
+    }
+
+    // Handle case where table is at the end
+    if (inTable && tableLines.length > 0) {
+      if (tableLines.length >= 2) {
+        const hasHeaderSeparator = tableLines[1].includes("---");
+        if (!hasHeaderSeparator) {
+          const headerCols = tableLines[0].split("|").length - 2;
+          const separator = "|" + Array(headerCols).fill("---").join("|") + "|";
+          tableLines.splice(1, 0, separator);
+        }
+      }
+      processedLines.push(...tableLines);
+    }
+
+    return processedLines.join("\n");
+  } catch (error) {
+    console.warn("Error in table preprocessing:", error);
+    return content;
+  }
+};
+
 const components: Partial<Components> = {
   code: (props: React.ComponentProps<"code"> & { inline?: boolean }) => (
     <CodeBlock
@@ -119,9 +187,9 @@ const components: Partial<Components> = {
   ),
   pre: ({ children }) => <>{children}</>,
   table: ({ children, ...props }) => (
-    <div className="w-full overflow-x-auto">
+    <div className="w-full overflow-x-auto my-6">
       <table
-        className="min-w-[600px] border-collapse border border-gray-300 dark:border-gray-600 my-4 w-full"
+        className="min-w-full border-collapse border border-neutral-600 bg-neutral-800/50 rounded-lg overflow-hidden"
         {...props}
       >
         {children}
@@ -129,19 +197,19 @@ const components: Partial<Components> = {
     </div>
   ),
   thead: ({ children, ...props }) => (
-    <thead className="bg-gray-50 dark:bg-gray-800" {...props}>
+    <thead className="bg-neutral-700" {...props}>
       {children}
     </thead>
   ),
   tbody: ({ children, ...props }) => <tbody {...props}>{children}</tbody>,
   tr: ({ children, ...props }) => (
-    <tr className="border-b border-gray-200 dark:border-gray-700" {...props}>
+    <tr className="border-b border-neutral-600 last:border-b-0" {...props}>
       {children}
     </tr>
   ),
   th: ({ children, ...props }) => (
     <th
-      className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left font-semibold bg-gray-100 dark:bg-gray-700 dark:text-gray-100"
+      className="border-r border-neutral-600 last:border-r-0 px-4 py-3 text-left font-semibold text-white bg-neutral-700"
       {...props}
     >
       {children}
@@ -149,31 +217,46 @@ const components: Partial<Components> = {
   ),
   td: ({ children, ...props }) => (
     <td
-      className="border border-gray-300 dark:border-gray-600 px-4 py-2 dark:text-gray-100"
+      className="border-r border-neutral-600 last:border-r-0 px-4 py-3 text-white"
       {...props}
     >
       {children}
     </td>
   ),
   ol: ({ children, ...props }) => (
-    <ol className="list-decimal list-outside ml-4" {...props}>
+    <ol className="list-decimal list-outside ml-6 space-y-1" {...props}>
       {children}
     </ol>
   ),
   li: ({ children, ...props }) => (
-    <li className="py-1" {...props}>
+    <li className="leading-7" {...props}>
       {children}
     </li>
   ),
   ul: ({ children, ...props }) => (
-    <ul className="list-disc list-outside ml-4" {...props}>
-      {children}
+    <ul className="space-y-1 ml-0" {...props}>
+      {React.Children.map(children, (child, index) => {
+        if (React.isValidElement(child) && child.type === "li") {
+          return (
+            <li key={index} className="flex items-start leading-7">
+              <span className="text-gray-400 mr-3 mt-0.5 select-none">•</span>
+              <span className="flex-1">
+                {
+                  (child as React.ReactElement<{ children: React.ReactNode }>)
+                    .props.children
+                }
+              </span>
+            </li>
+          );
+        }
+        return child;
+      })}
     </ul>
   ),
   strong: ({ children, ...props }) => (
-    <span className="font-semibold" {...props}>
+    <strong className="font-semibold" {...props}>
       {children}
-    </span>
+    </strong>
   ),
   a: ({ children, ...props }) => (
     <a
@@ -186,34 +269,47 @@ const components: Partial<Components> = {
     </a>
   ),
   h1: ({ children, ...props }) => (
-    <h1 className="text-3xl font-semibold mt-6 mb-2" {...props}>
+    <h1 className="text-2xl font-semibold mt-8 mb-4" {...props}>
       {children}
     </h1>
   ),
   h2: ({ children, ...props }) => (
-    <h2 className="text-2xl font-semibold mt-6 mb-2" {...props}>
+    <h2 className="text-xl font-semibold mt-6 mb-3" {...props}>
       {children}
     </h2>
   ),
   h3: ({ children, ...props }) => (
-    <h3 className="text-xl font-semibold mt-6 mb-2" {...props}>
+    <h3 className="text-lg font-semibold mt-6 mb-2" {...props}>
       {children}
     </h3>
   ),
   h4: ({ children, ...props }) => (
-    <h4 className="text-lg font-semibold mt-6 mb-2" {...props}>
+    <h4 className="text-base font-semibold mt-4 mb-2" {...props}>
       {children}
     </h4>
   ),
   h5: ({ children, ...props }) => (
-    <h5 className="text-base font-semibold mt-6 mb-2" {...props}>
+    <h5 className="text-sm font-semibold mt-4 mb-2" {...props}>
       {children}
     </h5>
   ),
   h6: ({ children, ...props }) => (
-    <h6 className="text-sm font-semibold mt-6 mb-2" {...props}>
+    <h6 className="text-sm font-semibold mt-4 mb-2" {...props}>
       {children}
     </h6>
+  ),
+  p: ({ children, ...props }) => (
+    <p className="leading-7 [&:not(:first-child)]:mt-4" {...props}>
+      {children}
+    </p>
+  ),
+  blockquote: ({ children, ...props }) => (
+    <blockquote
+      className="border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic my-4"
+      {...props}
+    >
+      {children}
+    </blockquote>
   ),
 };
 
@@ -227,7 +323,8 @@ const NonMemoizedMarkdown = ({ children }: { children: string }) => {
       }
 
       const formattedContent = preprocessNumberFormatting(children);
-      return preprocessMathContent(formattedContent);
+      const mathProcessedContent = preprocessMathContent(formattedContent);
+      return preprocessTableContent(mathProcessedContent);
     } catch (error) {
       console.warn("Error processing markdown content:", error);
       return children;

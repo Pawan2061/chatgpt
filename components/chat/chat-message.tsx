@@ -222,8 +222,8 @@ export function ChatMessage({
   return (
     <div className="group relative mb-4 flex items-start md:px-4">
       <div className="flex w-full max-w-[800px] mx-auto items-start gap-4 px-4 py-6">
-        <div className="flex-1 space-y-4">
-          <div className="prose prose-invert max-w-none font-[16px] text-white">
+        <div className="flex-1 space-y-4 min-w-0">
+          <div className="prose prose-invert max-w-none font-[16px] text-white overflow-hidden">
             <ErrorBoundary
               fallback={
                 <div className="text-red-400">Failed to render content</div>
