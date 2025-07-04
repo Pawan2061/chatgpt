@@ -180,7 +180,7 @@ export default function Home() {
       />
 
       <div className="flex-1 flex flex-col relative">
-        <Navbar />
+        <Navbar onToggleMobileMenu={() => setIsMobileMenuOpen(true)} />
 
         <div className="flex-1 overflow-hidden">
           <div className="h-full overflow-y-auto">

@@ -11,6 +11,7 @@ import {
   Crown,
   Share,
   MoreHorizontal,
+  Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser, useClerk } from "@clerk/nextjs";
@@ -19,9 +20,14 @@ import { useRouter } from "next/navigation";
 interface NavbarProps {
   onNewChat?: () => void;
   className?: string;
+  onToggleMobileMenu?: () => void;
 }
 
-export function Navbar({ onNewChat, className }: NavbarProps) {
+export function Navbar({
+  onNewChat,
+  className,
+  onToggleMobileMenu,
+}: NavbarProps) {
   const { user } = useUser();
   const { signOut } = useClerk();
   const router = useRouter();
@@ -77,79 +83,97 @@ export function Navbar({ onNewChat, className }: NavbarProps) {
       )}
     >
       <div className="flex h-14 items-center justify-between px-4">
-        <div className="flex items-center" data-model-menu>
-          <Button
-            onClick={() => setIsModelMenuOpen(!isModelMenuOpen)}
-            variant="ghost"
-            className="h-8 px-3 text-white  hover:bg-[#FFFFFF26] hover:text-white rounded-lg flex items-center gap-2 relative"
-          >
-            <span className="text-lg font-medium">ChatGPT</span>
-            <ChevronDown className="h-4 w-4" />
-          </Button>
-          {/* Model Dropdown Menu */}
-          {isModelMenuOpen && (
-            <div className="absolute top-12 left-30 transform -translate-x-1/2 w-80 bg-[#2a2a2a] border border-neutral-700/50 rounded-xl shadow-2xl py-2 z-50">
-              {/* Model Options */}
-              <div className="px-4 py-2">
-                <div className="text-white text-sm font-medium mb-3">
-                  Choose a model
-                </div>
+        {/* Left Section - Mobile Menu Button and Model Selector */}
+        <div className="flex items-center gap-2">
+          {/* Mobile Menu Button */}
+          {onToggleMobileMenu && (
+            <Button
+              onClick={onToggleMobileMenu}
+              variant="ghost"
+              size="sm"
+              className="md:hidden h-8 w-8 p-0 text-neutral-400 hover:text-white hover:bg-neutral-800/50 rounded-lg"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
 
-                {/* GPT-4o */}
-                <div className="flex items-center justify-between p-3 hover:bg-neutral-700/50 rounded-lg cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">4</span>
-                    </div>
-                    <div>
-                      <div className="text-white text-sm font-medium">
-                        GPT-4o
+          {/* Model Selector */}
+          <div className="flex items-center" data-model-menu>
+            <Button
+              onClick={() => setIsModelMenuOpen(!isModelMenuOpen)}
+              variant="ghost"
+              className="h-8 px-3 text-white  hover:bg-[#FFFFFF26] hover:text-white rounded-lg flex items-center gap-2 relative"
+            >
+              <span className="text-lg font-medium">ChatGPT</span>
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+            {/* Model Dropdown Menu */}
+            {isModelMenuOpen && (
+              <div className="absolute top-12 left-30 transform -translate-x-1/2 w-80 bg-[#2a2a2a] border border-neutral-700/50 rounded-xl shadow-2xl py-2 z-50">
+                {/* Model Options */}
+                <div className="px-4 py-2">
+                  <div className="text-white text-sm font-medium mb-3">
+                    Choose a model
+                  </div>
+
+                  {/* GPT-4o */}
+                  <div className="flex items-center justify-between p-3 hover:bg-neutral-700/50 rounded-lg cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">4</span>
                       </div>
-                      <div className="text-neutral-400 text-xs">
-                        Our smartest model
+                      <div>
+                        <div className="text-white text-sm font-medium">
+                          GPT-4o
+                        </div>
+                        <div className="text-neutral-400 text-xs">
+                          Our smartest model
+                        </div>
+                      </div>
+                    </div>
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  </div>
+
+                  {/* GPT-4o mini */}
+                  <div className="flex items-center justify-between p-3 hover:bg-neutral-700/50 rounded-lg cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">4</span>
+                      </div>
+                      <div>
+                        <div className="text-white text-sm font-medium">
+                          GPT-4o mini
+                        </div>
+                        <div className="text-neutral-400 text-xs">
+                          Great for everyday tasks
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                </div>
 
-                {/* GPT-4o mini */}
-                <div className="flex items-center justify-between p-3 hover:bg-neutral-700/50 rounded-lg cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">4</span>
-                    </div>
-                    <div>
-                      <div className="text-white text-sm font-medium">
-                        GPT-4o mini
+                  {/* O1 Preview */}
+                  <div className="flex items-center justify-between p-3 hover:bg-neutral-700/50 rounded-lg cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">o1</span>
                       </div>
-                      <div className="text-neutral-400 text-xs">
-                        Great for everyday tasks
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* O1 Preview */}
-                <div className="flex items-center justify-between p-3 hover:bg-neutral-700/50 rounded-lg cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">o1</span>
-                    </div>
-                    <div>
-                      <div className="text-white text-sm font-medium">
-                        o1-preview
-                      </div>
-                      <div className="text-neutral-400 text-xs">
-                        Reasoning model for hard problems
+                      <div>
+                        <div className="text-white text-sm font-medium">
+                          o1-preview
+                        </div>
+                        <div className="text-neutral-400 text-xs">
+                          Reasoning model for hard problems
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
+
+        {/* Center Section - Get Plus Button */}
         <div className="flex items-center">
           <Button
             variant="ghost"
