@@ -1,10 +1,11 @@
 "use client";
 
 import { Message } from "ai/react";
-import ReactMarkdown from "react-markdown";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Edit, Check, X } from "lucide-react";
+import { Markdown } from "@/components/ui/markdown";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 interface ChatMessageProps {
   message: Message & { files?: { url: string; name: string; type: string }[] };
@@ -183,7 +184,21 @@ export function ChatMessage({
 
                 <div className="bg-[#2f2f2f] text-white px-4 py-3 rounded-3xl max-w-fit">
                   <div className="text-[15px] leading-relaxed">
-                    {message.content}
+                    <ErrorBoundary
+                      fallback={
+                        <div className="text-neutral-400">
+                          Failed to render content
+                        </div>
+                      }
+                    >
+                      <Suspense
+                        fallback={
+                          <div className="animate-pulse">Loading...</div>
+                        }
+                      >
+                        <Markdown>{message.content}</Markdown>
+                      </Suspense>
+                    </ErrorBoundary>
                   </div>
                 </div>
 
@@ -209,7 +224,24 @@ export function ChatMessage({
       <div className="flex w-full max-w-[800px] mx-auto items-start gap-4 px-4 py-6">
         <div className="flex-1 space-y-4">
           <div className="prose prose-invert max-w-none font-[16px] text-white">
-            <ReactMarkdown>{message.content}</ReactMarkdown>
+            <ErrorBoundary
+              fallback={
+                <div className="text-red-400">Failed to render content</div>
+              }
+            >
+              <Suspense
+                fallback={
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
+                    <span className="text-neutral-400">
+                      Rendering content...
+                    </span>
+                  </div>
+                }
+              >
+                <Markdown>{message.content}</Markdown>
+              </Suspense>
+            </ErrorBoundary>
           </div>
 
           {message.files && message.files.length > 0 && (
