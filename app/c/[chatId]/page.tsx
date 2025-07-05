@@ -238,6 +238,24 @@ export default function ChatPage() {
       );
 
       setMessages(updatedMessages);
+
+      // Also populate messageFiles state for messages that have files
+      const newMessageFiles: Record<number, UploadedFile[]> = {};
+      currentChat.messages.forEach(
+        (msg: ChatMessageWithFiles, index: number) => {
+          if (msg.files && msg.files.length > 0) {
+            newMessageFiles[index] = convertDbFilesToUploadedFiles(msg.files);
+          }
+        }
+      );
+
+      if (Object.keys(newMessageFiles).length > 0) {
+        setMessageFiles(newMessageFiles);
+        console.log(
+          "Populated messageFiles state from database:",
+          newMessageFiles
+        );
+      }
     }
   }, [currentChat?.messages, messages.length, params.chatId, setMessages]);
 
@@ -283,6 +301,40 @@ export default function ChatPage() {
       );
 
       const updatedMessages = [...messages];
+
+      const originalMessage = updatedMessages[messageIndex] as MessageWithFiles;
+
+      console.log("Original message files:", originalMessage.files);
+      console.log("Message files state:", messageFiles);
+
+      let extractedFiles: UploadedFile[] = [];
+
+      if (messageFiles[messageIndex] && messageFiles[messageIndex].length > 0) {
+        extractedFiles = messageFiles[messageIndex];
+        console.log("Found files in messageFiles state:", extractedFiles);
+      } else if (originalMessage.files && originalMessage.files.length > 0) {
+        extractedFiles = convertDbFilesToUploadedFiles(originalMessage.files);
+        console.log("Found files in message.files property:", extractedFiles);
+      } else {
+        let files = (originalMessage as MessageWithFiles).files;
+
+        if (files && Array.isArray(files)) {
+          files = convertDbFilesToUploadedFiles(files);
+        }
+
+        if (originalMessage.role === "user" && (!files || files.length === 0)) {
+          const trackedFiles = messageFiles[messageIndex];
+          if (trackedFiles && trackedFiles.length > 0) {
+            files = trackedFiles;
+          }
+        }
+
+        extractedFiles = files || [];
+        console.log("Extracted files from rendering logic:", extractedFiles);
+      }
+
+      console.log("Final extracted files for API:", extractedFiles);
+
       updatedMessages[messageIndex] = {
         ...updatedMessages[messageIndex],
         content: newContent,
@@ -295,7 +347,7 @@ export default function ChatPage() {
       await reload({
         body: {
           chatId: params.chatId,
-          files: uploadedFiles,
+          files: extractedFiles,
           isEdit: true,
           messages: messagesUpToEdit,
         },

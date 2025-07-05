@@ -13,7 +13,6 @@ export async function POST(req: Request) {
     const userId = user.id;
 
     if (action === "add") {
-      // Add memory to a test chat
       const testChatId = "test-chat-" + Date.now();
 
       await addMemory(text, {
