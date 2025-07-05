@@ -284,13 +284,30 @@ export async function POST(req: Request) {
             );
 
             console.log("=== Adding to Memory ===");
-            const conversationContext = `User asked: "${finalMessageContent}"\nAssistant responded: "${
-              result.text
-            }"\nContext: Chat about ${
-              hasFiles ? "files/documents" : "general topics"
-            }${hasImages ? " with images" : ""}`;
+            const userQuery = finalMessageContent.trim();
+            const assistantResponse = result.text.trim();
 
-            await addMemory(conversationContext, {
+            // Create a more searchable memory format
+            const memoryContent = [
+              `User asked about: ${userQuery}`,
+              `Assistant provided: ${assistantResponse.substring(0, 300)}${
+                assistantResponse.length > 300 ? "..." : ""
+              }`,
+              `Topic: ${
+                hasFiles
+                  ? "file analysis"
+                  : hasImages
+                  ? "image analysis"
+                  : "general conversation"
+              }`,
+            ].join("\n");
+
+            console.log(
+              "Memory content being stored:",
+              memoryContent.substring(0, 200) + "..."
+            );
+
+            await addMemory(memoryContent, {
               userId,
               chatId: actualChatId,
               metadata: {
@@ -298,8 +315,22 @@ export async function POST(req: Request) {
                 messageCount: updatedChat.messages.length,
                 hasFiles: hasFiles,
                 hasImages: hasImages,
-                userQuery: finalMessageContent.slice(0, 100),
+                userQuery: userQuery.slice(0, 200), // Store more of the query
                 responseLength: result.text.length,
+                conversationType: hasFiles
+                  ? "file_analysis"
+                  : hasImages
+                  ? "image_analysis"
+                  : "general",
+                // Add keywords for better searchability
+                keywords: [
+                  ...userQuery
+                    .toLowerCase()
+                    .split(" ")
+                    .filter((word: string) => word.length > 3),
+                  ...(hasFiles ? ["file", "document", "analysis"] : []),
+                  ...(hasImages ? ["image", "picture", "visual"] : []),
+                ].slice(0, 10), // Limit keywords
               },
             });
           }

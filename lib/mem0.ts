@@ -1,12 +1,16 @@
 import { MemoryClient } from "mem0ai";
 
-if (!process.env.NEXT_PUBLIC_MEM0_API_KEY) {
-  throw new Error("NEXT_PUBLIC_MEM0_API_KEY is not defined");
+if (!process.env.MEM0_API_KEY) {
+  console.warn(
+    "MEM0_API_KEY is not defined - memory functionality will be disabled"
+  );
 }
 
-const mem0Client = new MemoryClient({
-  apiKey: process.env.NEXT_PUBLIC_MEM0_API_KEY,
-});
+const mem0Client = process.env.MEM0_API_KEY
+  ? new MemoryClient({
+      apiKey: process.env.MEM0_API_KEY,
+    })
+  : null;
 
 export interface MemorySearchResult {
   id: string;
@@ -50,6 +54,11 @@ export async function addMemory(
   options: MemoryAddOptions
 ): Promise<void> {
   try {
+    if (!mem0Client) {
+      console.warn("MEM0 client not initialized - skipping memory addition");
+      return;
+    }
+
     const { userId, chatId, metadata = {} } = options;
 
     console.log("Adding memory to Mem0:", {
@@ -79,7 +88,6 @@ export async function addMemory(
     console.log("Memory added successfully");
   } catch (error) {
     console.error("Error adding memory:", error);
-    // Don't throw error to avoid breaking chat flow
   }
 }
 
@@ -88,7 +96,12 @@ export async function searchMemories(
   options: MemorySearchOptions
 ): Promise<MemorySearchResult[]> {
   try {
-    const { userId, limit = 10, threshold = 0.7 } = options;
+    if (!mem0Client) {
+      console.warn("MEM0 client not initialized - returning empty results");
+      return [];
+    }
+
+    const { userId, limit = 10, threshold = 0.3 } = options; // Lowered threshold from 0.5 to 0.3 for better recall
 
     console.log("Searching memories in Mem0:", {
       query: query.substring(0, 100) + "...",
@@ -102,10 +115,20 @@ export async function searchMemories(
       limit,
     })) as MemoryApiResponse[];
 
-    console.log(response, "response is here");
+    console.log(
+      "Raw memory search response:",
+      JSON.stringify(response, null, 2)
+    );
 
     const filteredResults: MemorySearchResult[] = response
-      .filter((result: MemoryApiResponse) => result.score >= threshold)
+      .filter((result: MemoryApiResponse) => {
+        console.log(
+          `Memory score: ${result.score}, threshold: ${threshold}, passes: ${
+            result.score >= threshold
+          }`
+        );
+        return result.score >= threshold;
+      })
       .map((result: MemoryApiResponse) => ({
         id: result.id || "",
         memory: result.memory,
@@ -113,7 +136,22 @@ export async function searchMemories(
         metadata: result.metadata,
       }));
 
-    console.log(`Found ${filteredResults.length} relevant memories`);
+    console.log(
+      `Found ${filteredResults.length} relevant memories out of ${response.length} total memories`
+    );
+
+    // Also log the memories that were filtered out
+    const filteredOut = response.filter((r) => r.score < threshold);
+    if (filteredOut.length > 0) {
+      console.log(
+        "Memories filtered out due to low score:",
+        filteredOut.map((r) => ({
+          score: r.score,
+          memory: r.memory.substring(0, 100) + "...",
+        }))
+      );
+    }
+
     return filteredResults;
   } catch (error) {
     console.error("Error searching memories:", error);
@@ -126,6 +164,11 @@ export async function getChatMemories(
   chatId: string
 ): Promise<MemorySearchResult[]> {
   try {
+    if (!mem0Client) {
+      console.warn("MEM0 client not initialized - returning empty results");
+      return [];
+    }
+
     const response = (await mem0Client.getAll({
       user_id: userId,
     })) as MemoryApiResponse[];
@@ -153,6 +196,11 @@ export async function deleteChatMemories(
   chatId: string
 ): Promise<void> {
   try {
+    if (!mem0Client) {
+      console.warn("MEM0 client not initialized - skipping memory deletion");
+      return;
+    }
+
     const memories = (await mem0Client.getAll({
       user_id: userId,
     })) as MemoryApiResponse[];
@@ -202,11 +250,36 @@ export async function prepareContextWithMemory(
     const reservedTokensForResponse = 4000;
     const availableTokens = maxTokens - reservedTokensForResponse;
 
-    const relevantMemories = await searchMemories(currentQuery, {
-      userId,
-      limit: 15,
-      threshold: 0.6,
-    });
+    let relevantMemories: MemorySearchResult[] = [];
+
+    // Only search memories if mem0Client is available
+    if (mem0Client) {
+      console.log("=== Memory Search Debug ===");
+      console.log("Current query:", currentQuery);
+      console.log("User ID:", userId);
+
+      relevantMemories = await searchMemories(currentQuery, {
+        userId,
+        limit: 15,
+        threshold: 0.3, // Lowered threshold for better recall
+      });
+
+      console.log("Relevant memories found:", relevantMemories.length);
+      if (relevantMemories.length > 0) {
+        console.log(
+          "Top memories:",
+          relevantMemories.slice(0, 3).map((m) => ({
+            score: m.score,
+            memory: m.memory.substring(0, 100) + "...",
+            chatId: m.metadata?.chat_id,
+          }))
+        );
+      }
+    } else {
+      console.warn(
+        "MEM0 client not available - proceeding without memory context"
+      );
+    }
 
     // Prepare context messages
     const contextMessages: ChatMessage[] = [];
@@ -223,13 +296,24 @@ export async function prepareContextWithMemory(
     if (relevantMemories.length > 0) {
       const memoryContext = relevantMemories
         .slice(0, 5) // Limit to top 5 memories
-        .map((m) => m.memory)
-        .join("\n");
+        .map(
+          (m) =>
+            `[Previous conversation - Score: ${m.score.toFixed(2)}]: ${
+              m.memory
+            }`
+        )
+        .join("\n\n");
 
       contextMessages.push({
         role: "system",
-        content: `Previous conversation context:\n${memoryContext}`,
+        content: `Previous conversation context from your memory:\n\n${memoryContext}`,
       });
+
+      console.log(
+        "Added memory context with",
+        relevantMemories.slice(0, 5).length,
+        "memories"
+      );
     }
 
     // Add recent messages with token limit management

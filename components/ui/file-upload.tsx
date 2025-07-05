@@ -38,6 +38,7 @@ const SUPPORTED_FILE_TYPES = {
   ],
 };
 
+
 const ALL_SUPPORTED_TYPES = [
   ...SUPPORTED_FILE_TYPES.images,
   ...SUPPORTED_FILE_TYPES.documents,
